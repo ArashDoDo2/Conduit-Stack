@@ -55,7 +55,7 @@ intentionally Linux-first.
 One-line install (downloads and runs the installer):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh && bash bootstrap-conduits.sh
 ```
 
 ```bash
