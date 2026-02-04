@@ -49,8 +49,9 @@ fi
 ########################################
 # CONDUIT COUNT
 ########################################
+COUNT=
 if [ -r /dev/tty ]; then
-  read -r -p "How many Conduit instances do you want? " COUNT < /dev/tty
+  read -r -p "How many Conduit instances do you want? " COUNT < /dev/tty || true
 else
   echo "No TTY available for interactive input."
   exit 1
@@ -61,8 +62,9 @@ COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
 ########################################
 # PER-CLIENT LIMITS
 ########################################
+MAX_CLIENTS=
 if [ -r /dev/tty ]; then
-  read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS < /dev/tty
+  read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS < /dev/tty || true
 else
   echo "No TTY available for interactive input."
   exit 1
@@ -70,8 +72,9 @@ fi
 MAX_CLIENTS=${MAX_CLIENTS:-50}
 MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
 
+BW_Mbps=
 if [ -r /dev/tty ]; then
-  read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps < /dev/tty
+  read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps < /dev/tty || true
 else
   echo "No TTY available for interactive input."
   exit 1
@@ -89,8 +92,9 @@ echo "  Max clients       : $MAX_CLIENTS per Conduit"
 echo "  Bandwidth limit   : $BW_Mbps Mbps per client"
 echo ""
 
+CONFIRM=
 if [ -r /dev/tty ]; then
-  read -r -p "Proceed with installation? (y/n): " CONFIRM < /dev/tty
+  read -r -p "Proceed with installation? (y/n): " CONFIRM < /dev/tty || true
 else
   echo "No TTY available for interactive input."
   exit 1
