@@ -274,6 +274,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
       "targets": [{
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
@@ -283,6 +286,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
       "targets": [{
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
@@ -293,12 +299,18 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Total Uploaded (bytes)",
       "gridPos": { "x": 0, "y": 18, "w": 12, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
       "targets": [{ "expr": "sum(conduit_bytes_uploaded)" }]
     },
     {
       "type": "stat",
       "title": "Total Downloaded (bytes)",
       "gridPos": { "x": 12, "y": 18, "w": 12, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      },
       "targets": [{ "expr": "sum(conduit_bytes_downloaded)" }]
     }
   ]
