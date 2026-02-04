@@ -63,6 +63,22 @@ fi
 # EXISTING SETUP
 ########################################
 EXISTING=$(docker ps -a --format '{{.Names}}' | grep -E '^conduit[0-9]+$|^prometheus$|^grafana$' || true)
+EXISTING_CONDUITS=$(docker ps -a --format '{{.Names}}' | grep -E '^conduit[0-9]+$' || true)
+EXISTING_MAX_INDEX=0
+EXISTING_COUNT=0
+EXISTING_IDX=()
+if [ -n "$EXISTING_CONDUITS" ]; then
+  while IFS= read -r name; do
+    idx="${name#conduit}"
+    if [[ "$idx" =~ ^[0-9]+$ ]]; then
+      EXISTING_IDX+=("$idx")
+      EXISTING_COUNT=$((EXISTING_COUNT+1))
+      if [ "$idx" -gt "$EXISTING_MAX_INDEX" ]; then
+        EXISTING_MAX_INDEX="$idx"
+      fi
+    fi
+  done <<< "$EXISTING_CONDUITS"
+fi
 
 if [ -n "$EXISTING" ]; then
   hr
@@ -93,9 +109,18 @@ info "Answer a few questions to configure your stack."
 echo ""
 
 COUNT=
-read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
-COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
-[[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
+ADD_COUNT=
+if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  read -r -u 3 -p "How many NEW Conduit instances to add? [0]: " ADD_COUNT || true
+  ADD_COUNT=${ADD_COUNT:-0}
+  ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
+  [[ "$ADD_COUNT" =~ ^[0-9]+$ ]] || { err "Invalid number"; exit 1; }
+  COUNT=$((EXISTING_MAX_INDEX + ADD_COUNT))
+else
+  read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
+  COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
+  [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
+fi
 
 ########################################
 # PER-CLIENT LIMITS
@@ -116,7 +141,13 @@ BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
 echo ""
 hr
 printf '%b\n' "${C_BOLD}Summary${C_RESET}"
-printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
+if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
+  printf '  %-20s %s\n' "Adding:" "$ADD_COUNT"
+  printf '  %-20s %s\n' "Total conduits:" "$COUNT"
+else
+  printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
+fi
 printf '  %-20s %s\n' "Max clients:" "$MAX_CLIENTS per Conduit"
 printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps per client"
 hr
@@ -130,7 +161,14 @@ read -r -u 3 -p "Proceed with installation? (y/n): " CONFIRM || true
 # DIRECTORIES
 ########################################
 mkdir -p prometheus-data grafana-data grafana-provisioning/{datasources,dashboards}
-for ((i=1; i<=COUNT; i++)); do mkdir -p "conduit$i-data"; done
+INDICES=()
+if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  for idx in "${EXISTING_IDX[@]}"; do INDICES+=("$idx"); done
+  for ((i=EXISTING_MAX_INDEX+1; i<=COUNT; i++)); do INDICES+=("$i"); done
+else
+  for ((i=1; i<=COUNT; i++)); do INDICES+=("$i"); done
+fi
+for idx in "${INDICES[@]}"; do mkdir -p "conduit$idx-data"; done
 
 ########################################
 # PROMETHEUS CONFIG
@@ -145,8 +183,8 @@ scrape_configs:
       - targets:
 EOF
 
-for ((i=1; i<=COUNT; i++)); do
-  echo "          - conduit$i:$((BASE_PORT+i-1))" >> prometheus.yml
+for idx in "${INDICES[@]}"; do
+  echo "          - conduit$idx:$((BASE_PORT+idx-1))" >> prometheus.yml
 done
 
 ########################################
@@ -274,11 +312,11 @@ cat > docker-compose.yml <<EOF
 services:
 EOF
 
-for ((i=1; i<=COUNT; i++)); do
+for idx in "${INDICES[@]}"; do
 cat >> docker-compose.yml <<EOF
-  conduit$i:
+  conduit$idx:
     image: $IMAGE
-    container_name: conduit$i
+    container_name: conduit$idx
     user: "0:0"
     restart: unless-stopped
     command:
@@ -286,9 +324,9 @@ cat >> docker-compose.yml <<EOF
        "--max-clients","$MAX_CLIENTS",
        "--bandwidth","$BW_Mbps",
        "--data-dir","/data",
-       "--metrics-addr","0.0.0.0:$((BASE_PORT+i-1))"]
+       "--metrics-addr","0.0.0.0:$((BASE_PORT+idx-1))"]
     volumes:
-      - ./conduit$i-data:/data
+      - ./conduit$idx-data:/data
 EOF
 done
 
@@ -323,5 +361,9 @@ EOF
 ########################################
 echo ""
 info "Starting stack..."
-$COMPOSE_CMD up -d --remove-orphans
+if [ "${MODE:-1}" = "2" ]; then
+  $COMPOSE_CMD up -d --remove-orphans
+else
+  $COMPOSE_CMD up -d
+fi
 ok "DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
