@@ -65,10 +65,15 @@ fi
 EXISTING=$(docker ps -a --format '{{.Names}}' | grep -E '^conduit[0-9]+$|^prometheus$|^grafana$' || true)
 
 if [ -n "$EXISTING" ]; then
-  warn "Existing containers detected:"
-  printf '%s\n' "$EXISTING"
-  echo "1) Keep existing setup"
-  echo "2) CLEAN install (remove containers + data)"
+  hr
+  warn "Existing containers detected"
+  while IFS= read -r name; do
+    [ -n "$name" ] && printf '  - %s\n' "$name"
+  done <<< "$EXISTING"
+  echo ""
+  info "Choose how to proceed:"
+  echo "  1) Keep existing setup"
+  echo "  2) CLEAN install (remove containers + data)"
   read -r -u 3 -p "Choose [1/2]: " MODE
   if [ "$MODE" = "2" ]; then
     while IFS= read -r name; do
