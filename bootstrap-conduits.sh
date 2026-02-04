@@ -32,9 +32,11 @@ if [ -n "$EXISTING" ]; then
   echo "$EXISTING"
   echo "1) Keep existing setup"
   echo "2) CLEAN install (remove containers + data)"
-  read -p "Choose [1/2]: " MODE
+  read -r -p "Choose [1/2]: " MODE
   if [ "$MODE" = "2" ]; then
-    docker rm -f $EXISTING || true
+    while IFS= read -r name; do
+      [ -n "$name" ] && docker rm -f "$name" || true
+    done <<< "$EXISTING"
     rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
   fi
 fi
@@ -42,20 +44,20 @@ fi
 ########################################
 # CONDUIT COUNT
 ########################################
-read -p "How many Conduit instances do you want? " COUNT
+read -r -p "How many Conduit instances do you want? " COUNT
 [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { echo "Invalid number"; exit 1; }
 
 ########################################
 # PER-CLIENT LIMITS
 ########################################
-read -p "Max clients per Conduit? [50]: " MAX_CLIENTS
+read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS
 MAX_CLIENTS=${MAX_CLIENTS:-50}
 
-read -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps
+read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps
 BW_Mbps=${BW_Mbps:-8}
 
-[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] || exit 1
-[[ "$BW_Mbps" =~ ^[0-9]+$ ]] || exit 1
+[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { echo "Invalid max clients"; exit 1; }
+[[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { echo "Invalid bandwidth"; exit 1; }
 
 echo ""
 echo "Summary:"
@@ -64,14 +66,14 @@ echo "  Max clients       : $MAX_CLIENTS per Conduit"
 echo "  Bandwidth limit   : $BW_Mbps Mbps per client"
 echo ""
 
-read -p "Proceed with installation? (y/n): " CONFIRM
+read -r -p "Proceed with installation? (y/n): " CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || exit 0
 
 ########################################
 # DIRECTORIES
 ########################################
 mkdir -p prometheus-data grafana-data grafana-provisioning/{datasources,dashboards}
-for i in $(seq 1 $COUNT); do mkdir -p conduit$i-data; done
+for ((i=1; i<=COUNT; i++)); do mkdir -p "conduit$i-data"; done
 
 ########################################
 # PROMETHEUS CONFIG
@@ -86,7 +88,7 @@ scrape_configs:
       - targets:
 EOF
 
-for i in $(seq 1 $COUNT); do
+for ((i=1; i<=COUNT; i++)); do
   echo "          - conduit$i:$((BASE_PORT+i-1))" >> prometheus.yml
 done
 
@@ -215,7 +217,7 @@ cat > docker-compose.yml <<EOF
 services:
 EOF
 
-for i in $(seq 1 $COUNT); do
+for ((i=1; i<=COUNT; i++)); do
 cat >> docker-compose.yml <<EOF
   conduit$i:
     image: $IMAGE

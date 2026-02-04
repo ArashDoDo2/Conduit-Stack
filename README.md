@@ -52,6 +52,12 @@ intentionally Linux-first.
 
 ## Quick Start
 
+One-line install (downloads and runs the installer):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh | bash
+```
+
 ```bash
 git clone https://github.com/ArashDoDo2/Conduit-Stack.git
 cd Conduit-Stack
@@ -75,6 +81,8 @@ After installation:
 - Username: `admin`
 - Password: `admin`
 - Dashboard: Dashboards -> Conduit -> Conduit - Clients & Traffic Volume
+
+Change the admin password on first login.
 
 Prometheus is not exposed on a host port by default. Grafana is the primary UI
 for metrics.
@@ -161,6 +169,15 @@ Run everything inside the WSL Ubuntu shell:
 - Installer fails to pull images: verify internet access and Docker daemon status.
 - Docker Compose not found: ensure `docker compose` (v2) or `docker-compose` is installed.
 - Permission errors: re-run the installer after ensuring Docker is running and your user can access it.
+
+## Uninstall
+
+If you want a clean removal:
+
+```bash
+docker rm -f $(docker ps -aq --filter name=conduit --filter name=prometheus --filter name=grafana) 2>/dev/null || true
+rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
+```
 
 ## Roadmap (Optional)
 
