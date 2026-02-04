@@ -12,6 +12,33 @@ else
 fi
 
 ########################################
+# UI HELPERS
+########################################
+if [ -t 1 ]; then
+  C_RESET="\033[0m"
+  C_BOLD="\033[1m"
+  C_DIM="\033[2m"
+  C_GREEN="\033[32m"
+  C_YELLOW="\033[33m"
+  C_CYAN="\033[36m"
+  C_RED="\033[31m"
+else
+  C_RESET=""
+  C_BOLD=""
+  C_DIM=""
+  C_GREEN=""
+  C_YELLOW=""
+  C_CYAN=""
+  C_RED=""
+fi
+
+hr() { printf '%b\n' "${C_DIM}--------------------------------------------------${C_RESET}"; }
+info() { printf '%b\n' "${C_CYAN}$*${C_RESET}"; }
+ok() { printf '%b\n' "${C_GREEN}$*${C_RESET}"; }
+warn() { printf '%b\n' "${C_YELLOW}$*${C_RESET}"; }
+err() { printf '%b\n' "${C_RED}$*${C_RESET}"; }
+
+########################################
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
@@ -21,14 +48,14 @@ GRAFANA_PORT=3000
 ########################################
 # DOCKER / COMPOSE
 ########################################
-command -v docker >/dev/null 2>&1 || { echo "❌ Docker not installed"; exit 1; }
+command -v docker >/dev/null 2>&1 || { err "Docker not installed"; exit 1; }
 
 if docker compose version >/dev/null 2>&1; then
   COMPOSE_CMD="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE_CMD="docker-compose"
 else
-  echo "❌ docker compose required"
+  err "docker compose required"
   exit 1
 fi
 
@@ -38,8 +65,8 @@ fi
 EXISTING=$(docker ps -a --format '{{.Names}}' | grep -E '^conduit[0-9]+$|^prometheus$|^grafana$' || true)
 
 if [ -n "$EXISTING" ]; then
-  echo "Existing containers detected:"
-  echo "$EXISTING"
+  warn "Existing containers detected:"
+  printf '%s\n' "$EXISTING"
   echo "1) Keep existing setup"
   echo "2) CLEAN install (remove containers + data)"
   read -r -u 3 -p "Choose [1/2]: " MODE
@@ -54,10 +81,16 @@ fi
 ########################################
 # CONDUIT COUNT
 ########################################
+hr
+printf '%b\n' "${C_BOLD}Conduit Stack Installer${C_RESET}"
+hr
+info "Answer a few questions to configure your stack."
+echo ""
+
 COUNT=
 read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
 COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
-[[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { echo "Invalid number"; exit 1; }
+[[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
 
 ########################################
 # PER-CLIENT LIMITS
@@ -72,14 +105,16 @@ read -r -u 3 -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps || true
 BW_Mbps=${BW_Mbps:-8}
 BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
 
-[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { echo "Invalid max clients"; exit 1; }
-[[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { echo "Invalid bandwidth"; exit 1; }
+[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { err "Invalid max clients"; exit 1; }
+[[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
 
 echo ""
-echo "Summary:"
-echo "  Conduit instances : $COUNT"
-echo "  Max clients       : $MAX_CLIENTS per Conduit"
-echo "  Bandwidth limit   : $BW_Mbps Mbps per client"
+hr
+printf '%b\n' "${C_BOLD}Summary${C_RESET}"
+printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
+printf '  %-20s %s\n' "Max clients:" "$MAX_CLIENTS per Conduit"
+printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps per client"
+hr
 echo ""
 
 CONFIRM=
@@ -281,6 +316,7 @@ EOF
 ########################################
 # RUN
 ########################################
-echo "🚀 Starting stack..."
+echo ""
+info "Starting stack..."
 $COMPOSE_CMD up -d --remove-orphans
-echo "✅ DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
+ok "DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
