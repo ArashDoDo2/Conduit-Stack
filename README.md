@@ -71,6 +71,7 @@ The installer will ask:
 
 - Whether to keep or clean an existing setup (if found)
 - If you keep: how many new Conduit instances to add (it shows current count)
+- If you keep and add 0: whether to upgrade images and restart containers
 - If you clean: how many Conduit instances to run total
 - Max clients per Conduit (default: 50)
 - Bandwidth per client in Mbps (default: 8)

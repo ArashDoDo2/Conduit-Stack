@@ -116,10 +116,16 @@ if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
   [[ "$ADD_COUNT" =~ ^[0-9]+$ ]] || { err "Invalid number"; exit 1; }
   COUNT=$((EXISTING_MAX_INDEX + ADD_COUNT))
+  UPGRADE=0
+  if [ "$ADD_COUNT" -eq 0 ]; then
+    read -r -u 3 -p "No new instances requested. Upgrade images and restart containers? (y/n): " UPGRADE_CONFIRM || true
+    [[ "$UPGRADE_CONFIRM" =~ ^[Yy]$ ]] && UPGRADE=1
+  fi
 else
   read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
   COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
   [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
+  UPGRADE=0
 fi
 
 ########################################
@@ -373,7 +379,11 @@ EOF
 ########################################
 echo ""
 info "Starting stack..."
-if [ "${MODE:-1}" = "2" ]; then
+if [ "${MODE:-1}" = "1" ] && [ "${UPGRADE:-0}" -eq 1 ]; then
+  info "Pulling latest images..."
+  $COMPOSE_CMD pull
+  $COMPOSE_CMD up -d
+elif [ "${MODE:-1}" = "2" ]; then
   $COMPOSE_CMD up -d --remove-orphans
 else
   $COMPOSE_CMD up -d
