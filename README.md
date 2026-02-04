@@ -52,11 +52,13 @@ intentionally Linux-first.
 
 ## Quick Start
 
-One-line install (downloads and runs the installer):
+Option A (recommended): download and run the installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh && bash bootstrap-conduits.sh
 ```
+
+Option B: clone the repo and run locally:
 
 ```bash
 git clone https://github.com/ArashDoDo2/Conduit-Stack.git
@@ -67,8 +69,9 @@ chmod +x bootstrap-conduits.sh
 
 The installer will ask:
 
-- Whether to keep or clean an existing setup
-- How many Conduit instances to run
+- Whether to keep or clean an existing setup (if found)
+- If you keep: how many new Conduit instances to add (it shows current count)
+- If you clean: how many Conduit instances to run total
 - Max clients per Conduit (default: 50)
 - Bandwidth per client in Mbps (default: 8)
 - Confirmation to proceed
