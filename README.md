@@ -1,6 +1,7 @@
 # Conduit Stack
 
 [![License](https://img.shields.io/github/license/ArashDoDo2/Conduit-Stack)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ArashDoDo2/Conduit-Stack?display_name=tag)](https://github.com/ArashDoDo2/Conduit-Stack/releases)
 
 A production-grade, opinionated stack for running **Psiphon Conduit** with
 **Prometheus** and **Grafana**, deployed via a single interactive installer.
