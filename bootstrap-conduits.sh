@@ -111,7 +111,7 @@ echo ""
 COUNT=
 ADD_COUNT=
 if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
-  read -r -u 3 -p "How many NEW Conduit instances to add? [0]: " ADD_COUNT || true
+  read -r -u 3 -p "You currently have $EXISTING_COUNT Conduit instance(s). How many NEW to add? [0]: " ADD_COUNT || true
   ADD_COUNT=${ADD_COUNT:-0}
   ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
   [[ "$ADD_COUNT" =~ ^[0-9]+$ ]] || { err "Invalid number"; exit 1; }
