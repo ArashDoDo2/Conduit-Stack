@@ -2,6 +2,18 @@
 set -e
 
 ########################################
+# TTY HANDLING (for curl | bash)
+########################################
+if [ ! -t 0 ]; then
+  if [ -r /dev/tty ]; then
+    exec < /dev/tty
+  else
+    echo "No TTY available for interactive input."
+    exit 1
+  fi
+fi
+
+########################################
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
@@ -32,12 +44,7 @@ if [ -n "$EXISTING" ]; then
   echo "$EXISTING"
   echo "1) Keep existing setup"
   echo "2) CLEAN install (remove containers + data)"
-  if [ -r /dev/tty ]; then
-    read -r -p "Choose [1/2]: " MODE < /dev/tty
-  else
-    echo "No TTY available for interactive input."
-    exit 1
-  fi
+  read -r -p "Choose [1/2]: " MODE
   if [ "$MODE" = "2" ]; then
     while IFS= read -r name; do
       [ -n "$name" ] && docker rm -f "$name" || true
@@ -50,12 +57,7 @@ fi
 # CONDUIT COUNT
 ########################################
 COUNT=
-if [ -r /dev/tty ]; then
-  read -r -p "How many Conduit instances do you want? " COUNT < /dev/tty || true
-else
-  echo "No TTY available for interactive input."
-  exit 1
-fi
+read -r -p "How many Conduit instances do you want? " COUNT || true
 COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
 [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { echo "Invalid number"; exit 1; }
 
@@ -63,22 +65,12 @@ COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
 # PER-CLIENT LIMITS
 ########################################
 MAX_CLIENTS=
-if [ -r /dev/tty ]; then
-  read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS < /dev/tty || true
-else
-  echo "No TTY available for interactive input."
-  exit 1
-fi
+read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS || true
 MAX_CLIENTS=${MAX_CLIENTS:-50}
 MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
 
 BW_Mbps=
-if [ -r /dev/tty ]; then
-  read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps < /dev/tty || true
-else
-  echo "No TTY available for interactive input."
-  exit 1
-fi
+read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps || true
 BW_Mbps=${BW_Mbps:-8}
 BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
 
@@ -93,12 +85,7 @@ echo "  Bandwidth limit   : $BW_Mbps Mbps per client"
 echo ""
 
 CONFIRM=
-if [ -r /dev/tty ]; then
-  read -r -p "Proceed with installation? (y/n): " CONFIRM < /dev/tty || true
-else
-  echo "No TTY available for interactive input."
-  exit 1
-fi
+read -r -p "Proceed with installation? (y/n): " CONFIRM || true
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || exit 0
 
 ########################################
