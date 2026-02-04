@@ -55,6 +55,7 @@ else
   echo "No TTY available for interactive input."
   exit 1
 fi
+COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
 [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { echo "Invalid number"; exit 1; }
 
 ########################################
@@ -67,6 +68,7 @@ else
   exit 1
 fi
 MAX_CLIENTS=${MAX_CLIENTS:-50}
+MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
 
 if [ -r /dev/tty ]; then
   read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps < /dev/tty
@@ -75,6 +77,7 @@ else
   exit 1
 fi
 BW_Mbps=${BW_Mbps:-8}
+BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
 
 [[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { echo "Invalid max clients"; exit 1; }
 [[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { echo "Invalid bandwidth"; exit 1; }
