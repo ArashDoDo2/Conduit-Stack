@@ -32,7 +32,12 @@ if [ -n "$EXISTING" ]; then
   echo "$EXISTING"
   echo "1) Keep existing setup"
   echo "2) CLEAN install (remove containers + data)"
-  read -r -p "Choose [1/2]: " MODE
+  if [ -r /dev/tty ]; then
+    read -r -p "Choose [1/2]: " MODE < /dev/tty
+  else
+    echo "No TTY available for interactive input."
+    exit 1
+  fi
   if [ "$MODE" = "2" ]; then
     while IFS= read -r name; do
       [ -n "$name" ] && docker rm -f "$name" || true
@@ -44,16 +49,31 @@ fi
 ########################################
 # CONDUIT COUNT
 ########################################
-read -r -p "How many Conduit instances do you want? " COUNT
+if [ -r /dev/tty ]; then
+  read -r -p "How many Conduit instances do you want? " COUNT < /dev/tty
+else
+  echo "No TTY available for interactive input."
+  exit 1
+fi
 [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { echo "Invalid number"; exit 1; }
 
 ########################################
 # PER-CLIENT LIMITS
 ########################################
-read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS
+if [ -r /dev/tty ]; then
+  read -r -p "Max clients per Conduit? [50]: " MAX_CLIENTS < /dev/tty
+else
+  echo "No TTY available for interactive input."
+  exit 1
+fi
 MAX_CLIENTS=${MAX_CLIENTS:-50}
 
-read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps
+if [ -r /dev/tty ]; then
+  read -r -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps < /dev/tty
+else
+  echo "No TTY available for interactive input."
+  exit 1
+fi
 BW_Mbps=${BW_Mbps:-8}
 
 [[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { echo "Invalid max clients"; exit 1; }
@@ -66,7 +86,12 @@ echo "  Max clients       : $MAX_CLIENTS per Conduit"
 echo "  Bandwidth limit   : $BW_Mbps Mbps per client"
 echo ""
 
-read -r -p "Proceed with installation? (y/n): " CONFIRM
+if [ -r /dev/tty ]; then
+  read -r -p "Proceed with installation? (y/n): " CONFIRM < /dev/tty
+else
+  echo "No TTY available for interactive input."
+  exit 1
+fi
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || exit 0
 
 ########################################
