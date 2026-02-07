@@ -17,7 +17,7 @@ deployment with correct metrics and dashboards with no manual configuration.
 - Accurate dashboards (no misleading metrics)
 - Short, readable instance names in Grafana (`conduit1`, `conduit2`, ...)
 - Configurable instance count, max clients, and bandwidth per client (Mbps)
-- Clean or keep existing installation modes
+- Clean, keep, or upgrade existing installation modes
 - Linux-first, Windows supported via WSL2
 - No node_exporter, no rate guessing, no fake traffic graphs
 
@@ -46,7 +46,7 @@ intentionally Linux-first.
 
 ## Requirements
 
-- Docker
+- Docker (installer can auto-install on common Linux distros)
 - Docker Compose v2 (`docker compose`)
 - Internet access (to pull images)
 
@@ -70,6 +70,7 @@ chmod +x bootstrap-conduits.sh
 The installer will ask:
 
 - Whether to keep or clean an existing setup (if found)
+- Optional upgrade in place (update images + restart, keep data)
 - If you keep: how many new Conduit instances to add (it shows current count)
 - If you keep and add 0: whether to upgrade images and restart containers
 - If you clean: how many Conduit instances to run total
@@ -124,6 +125,7 @@ The goal is operational correctness, not pretty but wrong charts.
 If an existing installation is detected, the installer asks:
 
 - Keep: reuse existing data and containers, update dashboards/configs
+- Upgrade: pull latest images and restart containers (data preserved)
 - Clean: remove containers and data directories, start fresh
 
 ## Repository Structure
@@ -160,6 +162,10 @@ Run everything inside the WSL Ubuntu shell:
 ./bootstrap-conduits.sh
 ```
 
+If Docker is missing inside WSL, the installer will prompt you to use
+Docker Desktop with WSL integration rather than attempting to install
+Docker inside WSL.
+
 ## Production Notes
 
 - Containers run as root inside Docker to avoid permission issues
@@ -173,6 +179,7 @@ Run everything inside the WSL Ubuntu shell:
 - Installer fails to pull images: verify internet access and Docker daemon status.
 - Docker Compose not found: ensure `docker compose` (v2) or `docker-compose` is installed.
 - Permission errors: re-run the installer after ensuring Docker is running and your user can access it.
+- WSL + Docker missing: install Docker Desktop on Windows and enable WSL integration.
 
 ## Uninstall
 
