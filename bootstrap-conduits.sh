@@ -711,7 +711,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "refId": "A",
-        "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "expr": "label_replace(avg_over_time(conduit_connected_clients[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -740,7 +740,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "refId": "A",
-        "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "expr": "label_replace(avg_over_time(conduit_connecting_clients[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -771,7 +771,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "refId": "A",
-        "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "expr": "label_replace(avg_over_time(conduit_bytes_uploaded[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -801,7 +801,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "refId": "A",
-        "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "expr": "label_replace(avg_over_time(conduit_bytes_downloaded[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
