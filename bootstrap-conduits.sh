@@ -217,8 +217,8 @@ REMOVE_DATA=0
 EXISTING_MAX_CLIENTS=""
 EXISTING_BW=""
 if [ -f docker-compose.yml ]; then
-  EXISTING_MAX_CLIENTS=$(grep -m1 -oE '--max-clients","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
-  EXISTING_BW=$(grep -m1 -oE '--bandwidth","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
+  EXISTING_MAX_CLIENTS=$(grep -m1 -oE -- '--max-clients","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
+  EXISTING_BW=$(grep -m1 -oE -- '--bandwidth","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
 fi
 if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   echo ""
