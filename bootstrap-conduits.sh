@@ -76,6 +76,18 @@ grafana_host_port() {
   docker inspect -f '{{(index (index .HostConfig.PortBindings "3000/tcp") 0).HostPort}}' grafana 2>/dev/null || true
 }
 
+port_bound_by_ours() {
+  local p="$1"
+  local names
+  names=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^(conduit[0-9]+|grafana|prometheus)$' || true)
+  [ -n "$names" ] || return 1
+  while IFS= read -r name; do
+    docker inspect -f '{{range $k,$v := .HostConfig.PortBindings}}{{(index $v 0).HostPort}}{{"\n"}}{{end}}' "$name" 2>/dev/null | \
+      grep -qx "$p" && return 0
+  done <<< "$names"
+  return 1
+}
+
 next_free_port() {
   local p="$1"
   local tries=0
@@ -385,6 +397,8 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
     fi
     if [ -n "$EXISTING_GRAFANA_PORT" ] && [ "$EXISTING_GRAFANA_PORT" = "$GRAFANA_PORT" ]; then
       info "Port $GRAFANA_PORT already used by existing Grafana; keeping it."
+    elif port_bound_by_ours "$GRAFANA_PORT"; then
+      info "Port $GRAFANA_PORT already used by existing Conduit stack; keeping it."
     else
       warn "Port $GRAFANA_PORT is already in use."
     SUGGESTED_PORT=$(next_free_port "$((GRAFANA_PORT+1))")
