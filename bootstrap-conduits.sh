@@ -553,6 +553,7 @@ cat > grafana-provisioning/datasources/prometheus.yaml <<EOF
 apiVersion: 1
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: $DS_URL
@@ -571,6 +572,7 @@ providers:
     folder: Conduit
     type: file
     editable: false
+    updateIntervalSeconds: 10
     options:
       path: /etc/grafana/provisioning/dashboards
 EOF
@@ -596,6 +598,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Connected Clients (Total)",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "green" }
@@ -606,12 +609,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "area",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "sum(conduit_connected_clients)" }]
+      "targets": [{ "refId": "A", "expr": "sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Max Capacity",
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "blue" }
@@ -622,12 +626,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "area",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "sum(conduit_max_clients)" }]
+      "targets": [{ "refId": "A", "expr": "sum(conduit_max_clients)" }]
     },
     {
       "type": "stat",
       "title": "Available Slots",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "yellow" }
@@ -638,12 +643,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "area",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
+      "targets": [{ "refId": "A", "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Is Live",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -656,13 +662,14 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "area",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "min(conduit_is_live)" }]
+      "targets": [{ "refId": "A", "expr": "min(conduit_is_live)" }]
     },
 
     {
       "type": "timeseries",
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -672,7 +679,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "lineWidth": 2,
             "fillOpacity": 24,
             "gradientMode": "opacity",
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": true
           }
         }
@@ -682,6 +689,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
+        "refId": "A",
         "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "legendFormat": "{{name}}",
         "instant": false,
@@ -692,6 +700,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -701,7 +710,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "lineWidth": 2,
             "fillOpacity": 24,
             "gradientMode": "opacity",
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": true
           }
         }
@@ -711,6 +720,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
+        "refId": "A",
         "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "legendFormat": "{{name}}",
         "instant": false,
@@ -722,6 +732,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -732,7 +743,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "lineWidth": 2,
             "fillOpacity": 24,
             "gradientMode": "opacity",
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": true
           }
         }
@@ -742,6 +753,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
+        "refId": "A",
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "legendFormat": "{{name}}",
         "instant": false,
@@ -752,6 +764,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -762,7 +775,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "lineWidth": 2,
             "fillOpacity": 24,
             "gradientMode": "opacity",
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": true
           }
         }
@@ -772,6 +785,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
+        "refId": "A",
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "legendFormat": "{{name}}",
         "instant": false,
@@ -783,19 +797,21 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Total Uploaded (bytes)",
       "gridPos": { "x": 0, "y": 18, "w": 12, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
-      "targets": [{ "expr": "sum(conduit_bytes_uploaded)" }]
+      "targets": [{ "refId": "A", "expr": "sum(conduit_bytes_uploaded)" }]
     },
     {
       "type": "stat",
       "title": "Total Downloaded (bytes)",
       "gridPos": { "x": 12, "y": 18, "w": 12, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
-      "targets": [{ "expr": "sum(conduit_bytes_downloaded)" }]
+      "targets": [{ "refId": "A", "expr": "sum(conduit_bytes_downloaded)" }]
     }
   ]
 }
