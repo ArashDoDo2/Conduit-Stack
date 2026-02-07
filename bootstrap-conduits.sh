@@ -32,11 +32,13 @@ else
   C_RED=""
 fi
 
-hr() { printf '%b\n' "${C_DIM}--------------------------------------------------${C_RESET}"; }
+hr() { printf '%b\n' "${C_CYAN}--------------------------------------------------${C_RESET}"; }
 info() { printf '%b\n' "${C_CYAN}$*${C_RESET}"; }
 ok() { printf '%b\n' "${C_GREEN}$*${C_RESET}"; }
 warn() { printf '%b\n' "${C_YELLOW}$*${C_RESET}"; }
 err() { printf '%b\n' "${C_RED}$*${C_RESET}"; }
+title() { printf '%b\n' "${C_BOLD}$*${C_RESET}"; }
+section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 
 ########################################
 # CONFIG
@@ -176,16 +178,16 @@ fi
 
 if [ -n "$EXISTING" ]; then
   hr
-  warn "Existing containers detected"
+  section "Existing containers detected"
   while IFS= read -r name; do
     [ -n "$name" ] && printf '  - %s\n' "$name"
   done <<< "$EXISTING"
   echo ""
   info "Choose how to proceed:"
-  echo "  1) Keep existing setup (add new containers to current setup)"
-  echo "  2) Upgrade in place (pull latest images, restart, keep data)"
-  echo "  3) CLEAN install (remove containers + data, start fresh)"
-  echo "  4) Modify existing setup (add or remove specific conduits)"
+  printf '  %b1%b) Keep existing setup %b(add new containers to current setup)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '  %b2%b) Upgrade in place %b(pull latest images, restart, keep data)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '  %b3%b) CLEAN install %b(remove containers + data, start fresh)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
   read -r -u 3 -p "Choose [1/2/3/4]: " MODE
   if [ "$MODE" = "3" ]; then
     while IFS= read -r name; do
@@ -203,7 +205,7 @@ fi
 # CONDUIT COUNT
 ########################################
 hr
-printf '%b\n' "${C_BOLD}Conduit Stack Installer${C_RESET}"
+title "Conduit Stack Installer"
 hr
 info "Answer a few questions to configure your stack."
 echo ""
@@ -212,9 +214,18 @@ COUNT=
 ADD_COUNT=
 REMOVE_IDX=()
 REMOVE_DATA=0
+EXISTING_MAX_CLIENTS=""
+EXISTING_BW=""
+if [ -f docker-compose.yml ]; then
+  EXISTING_MAX_CLIENTS=$(grep -m1 -oE '--max-clients","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
+  EXISTING_BW=$(grep -m1 -oE '--bandwidth","[0-9]+"' docker-compose.yml | grep -oE '[0-9]+' || true)
+fi
 if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   echo ""
-  info "Existing conduits: ${EXISTING_IDX[*]}"
+  info "Existing conduits:"
+  EXISTING_LABELS=()
+  for idx in "${EXISTING_IDX[@]}"; do EXISTING_LABELS+=("conduit$idx"); done
+  printf '  %b%s%b\n' "$C_BOLD" "${EXISTING_LABELS[*]}" "$C_RESET"
   read -r -u 3 -p "Conduit numbers to remove (comma-separated) [none]: " REMOVE_RAW || true
   REMOVE_RAW=$(printf '%s' "$REMOVE_RAW" | tr -d '[:space:]')
   if [ -n "$REMOVE_RAW" ]; then
@@ -285,32 +296,53 @@ else
   [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
 fi
 
+if [ "${MODE:-1}" = "1" ] && [ "${ADD_COUNT:-0}" -eq 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
+  info "No changes requested. Exiting."
+  exit 0
+fi
+
 ########################################
 # PER-CLIENT LIMITS
 ########################################
 MAX_CLIENTS=
-read -r -u 3 -p "Max clients per Conduit? [50]: " MAX_CLIENTS || true
-MAX_CLIENTS=${MAX_CLIENTS:-50}
-MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
-
 BW_Mbps=
-read -r -u 3 -p "Bandwidth per client (Mbps)? [8]: " BW_Mbps || true
-BW_Mbps=${BW_Mbps:-8}
-BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
+NEED_LIMITS=1
+if [ "${MODE:-1}" = "4" ] && [ "${ADD_COUNT:-0}" -eq 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
+  NEED_LIMITS=0
+fi
+
+if [ "$NEED_LIMITS" -eq 1 ]; then
+  read -r -u 3 -p "Max clients per Conduit? [${EXISTING_MAX_CLIENTS:-50}]: " MAX_CLIENTS || true
+  MAX_CLIENTS=${MAX_CLIENTS:-${EXISTING_MAX_CLIENTS:-50}}
+  MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
+
+  read -r -u 3 -p "Bandwidth per client (Mbps)? [${EXISTING_BW:-8}]: " BW_Mbps || true
+  BW_Mbps=${BW_Mbps:-${EXISTING_BW:-8}}
+  BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
+else
+  MAX_CLIENTS=${EXISTING_MAX_CLIENTS:-50}
+  BW_Mbps=${EXISTING_BW:-8}
+fi
 
 [[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { err "Invalid max clients"; exit 1; }
 [[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
 
 echo ""
 hr
-printf '%b\n' "${C_BOLD}Summary${C_RESET}"
+title "Summary"
 if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
   printf '  %-20s %s\n' "Adding:" "${ADD_COUNT:-0}"
   printf '  %-20s %s\n' "Total conduits:" "$COUNT"
 elif [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
-  printf '  %-20s %s\n' "Removing:" "${REMOVE_RAW:-none}"
+  if [ -n "${REMOVE_RAW:-}" ]; then
+    REMOVE_NAMES=()
+    for r in "${REMOVE_IDX[@]}"; do REMOVE_NAMES+=("conduit$r"); done
+    printf '  %-20s %s\n' "Removing:" "${REMOVE_NAMES[*]}"
+  else
+    printf '  %-20s %s\n' "Removing:" "none"
+  fi
   printf '  %-20s %s\n' "Adding:" "${ADD_COUNT:-0}"
   printf '  %-20s %s\n' "Total conduits:" "$COUNT"
 else
