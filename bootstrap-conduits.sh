@@ -46,6 +46,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
 BASE_PORT=9090
 GRAFANA_PORT=3000
+BACKUP_DIR="./backups"
 
 ########################################
 # DOCKER / COMPOSE
@@ -96,6 +97,17 @@ next_free_port() {
     tries=$((tries+1))
   done
   printf '%s' "$p"
+}
+
+backup_dir() {
+  local src="$1"
+  local label="$2"
+  [ -d "$src" ] || return 0
+  local ts
+  ts=$(date +%Y%m%d-%H%M%S)
+  mkdir -p "$BACKUP_DIR"
+  cp -a "$src" "$BACKUP_DIR/${label}-${ts}"
+  ok "Backup created: $BACKUP_DIR/${label}-${ts}"
 }
 
 ensure_docker() {
@@ -233,12 +245,35 @@ if [ -n "$EXISTING" ]; then
   printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
   read -r -u 3 -p "Choose [1/2/3/4]: " MODE
   if [ "$MODE" = "3" ]; then
+    if [ -d grafana-data ]; then
+      read -r -u 3 -p "Backup Grafana data before CLEAN install? (y/n) [y]: " BK_GRAFANA || true
+      BK_GRAFANA=${BK_GRAFANA:-y}
+      if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
+        backup_dir "grafana-data" "grafana-data"
+      fi
+    fi
+    DELETE_GRAFANA_DATA=1
+    if [ -d grafana-data ]; then
+      read -r -u 3 -p "Delete Grafana data? (y/n) [n]: " DEL_GRAFANA || true
+      DEL_GRAFANA=${DEL_GRAFANA:-n}
+      [[ "$DEL_GRAFANA" =~ ^[Yy]$ ]] || DELETE_GRAFANA_DATA=0
+    fi
     while IFS= read -r name; do
       [ -n "$name" ] && docker rm -f "$name" || true
     done <<< "$EXISTING"
-    rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
+    rm -rf conduit*-data prometheus-data grafana-provisioning prometheus.yml docker-compose.yml
+    if [ "$DELETE_GRAFANA_DATA" -eq 1 ]; then
+      rm -rf grafana-data
+    fi
   elif [ "$MODE" = "2" ]; then
     UPGRADE=1
+    if [ -d grafana-data ]; then
+      read -r -u 3 -p "Backup Grafana data before upgrade? (y/n) [y]: " BK_GRAFANA || true
+      BK_GRAFANA=${BK_GRAFANA:-y}
+      if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
+        backup_dir "grafana-data" "grafana-data"
+      fi
+    fi
   elif [ "$MODE" = "4" ]; then
     MODIFY=1
   fi
