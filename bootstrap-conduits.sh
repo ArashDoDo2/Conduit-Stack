@@ -698,7 +698,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 1,
-            "fillOpacity": 6,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
@@ -727,7 +727,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 1,
-            "fillOpacity": 6,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
@@ -758,7 +758,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 1,
-            "fillOpacity": 6,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
@@ -788,7 +788,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 1,
-            "fillOpacity": 6,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
