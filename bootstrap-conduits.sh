@@ -183,13 +183,16 @@ if [ -n "$EXISTING" ]; then
   echo ""
   info "Choose how to proceed:"
   echo "  1) Keep existing setup"
-  echo "  2) CLEAN install (remove containers + data)"
-  read -r -u 3 -p "Choose [1/2]: " MODE
-  if [ "$MODE" = "2" ]; then
+  echo "  2) Upgrade in place (update images, keep data)"
+  echo "  3) CLEAN install (remove containers + data)"
+  read -r -u 3 -p "Choose [1/2/3]: " MODE
+  if [ "$MODE" = "3" ]; then
     while IFS= read -r name; do
       [ -n "$name" ] && docker rm -f "$name" || true
     done <<< "$EXISTING"
     rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
+  elif [ "$MODE" = "2" ]; then
+    UPGRADE=1
   fi
 fi
 
@@ -204,22 +207,24 @@ echo ""
 
 COUNT=
 ADD_COUNT=
-if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
   read -r -u 3 -p "You currently have $EXISTING_COUNT Conduit instance(s). How many NEW to add? [0]: " ADD_COUNT || true
   ADD_COUNT=${ADD_COUNT:-0}
   ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
   [[ "$ADD_COUNT" =~ ^[0-9]+$ ]] || { err "Invalid number"; exit 1; }
   COUNT=$((EXISTING_MAX_INDEX + ADD_COUNT))
-  UPGRADE=0
   if [ "$ADD_COUNT" -eq 0 ]; then
     read -r -u 3 -p "No new instances requested. Upgrade images and restart containers? (y/n): " UPGRADE_CONFIRM || true
     [[ "$UPGRADE_CONFIRM" =~ ^[Yy]$ ]] && UPGRADE=1
   fi
+elif [ "${MODE:-1}" = "2" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  ADD_COUNT=0
+  COUNT="$EXISTING_MAX_INDEX"
+  UPGRADE=1
 else
   read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
   COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
   [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
-  UPGRADE=0
 fi
 
 ########################################
@@ -243,7 +248,7 @@ hr
 printf '%b\n' "${C_BOLD}Summary${C_RESET}"
 if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
-  printf '  %-20s %s\n' "Adding:" "$ADD_COUNT"
+  printf '  %-20s %s\n' "Adding:" "${ADD_COUNT:-0}"
   printf '  %-20s %s\n' "Total conduits:" "$COUNT"
 else
   printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
