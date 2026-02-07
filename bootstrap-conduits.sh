@@ -296,7 +296,7 @@ else
   [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number"; exit 1; }
 fi
 
-if [ "${MODE:-1}" = "1" ] && [ "${ADD_COUNT:-0}" -eq 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
+if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ] && [ "${ADD_COUNT:-0}" -eq 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
   info "No changes requested. Exiting."
   exit 0
 fi
