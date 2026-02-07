@@ -182,9 +182,9 @@ if [ -n "$EXISTING" ]; then
   done <<< "$EXISTING"
   echo ""
   info "Choose how to proceed:"
-  echo "  1) Keep existing setup"
-  echo "  2) Upgrade in place (update images, keep data)"
-  echo "  3) CLEAN install (remove containers + data)"
+  echo "  1) Keep existing setup (add new containers to current setup)"
+  echo "  2) Upgrade in place (pull latest images, restart, keep data)"
+  echo "  3) CLEAN install (remove containers + data, start fresh)"
   read -r -u 3 -p "Choose [1/2/3]: " MODE
   if [ "$MODE" = "3" ]; then
     while IFS= read -r name; do
@@ -478,11 +478,11 @@ EOF
 ########################################
 echo ""
 info "Starting stack..."
-if [ "${MODE:-1}" = "1" ] && [ "${UPGRADE:-0}" -eq 1 ]; then
+if [ "${UPGRADE:-0}" -eq 1 ]; then
   info "Pulling latest images..."
   $COMPOSE_CMD pull
-  $COMPOSE_CMD up -d
-elif [ "${MODE:-1}" = "2" ]; then
+fi
+if [ "${MODE:-1}" = "2" ]; then
   $COMPOSE_CMD up -d --remove-orphans
 else
   $COMPOSE_CMD up -d
