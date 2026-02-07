@@ -48,7 +48,101 @@ GRAFANA_PORT=3000
 ########################################
 # DOCKER / COMPOSE
 ########################################
-command -v docker >/dev/null 2>&1 || { err "Docker not installed"; exit 1; }
+is_wsl() {
+  grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || \
+  grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+ensure_docker() {
+  if command -v docker >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if is_wsl; then
+    err "Docker not found in WSL."
+    err "Recommended: install Docker Desktop on Windows and enable WSL integration."
+    err "Then re-run this script inside WSL."
+    exit 1
+  fi
+
+  warn "Docker not found. Installing..."
+  OS_ID=""
+  if [ -r /etc/os-release ]; then
+    OS_ID=$( . /etc/os-release && printf '%s' "$ID" )
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apt-get update -y
+      sudo apt-get install -y ca-certificates curl gnupg
+      sudo install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      sudo chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+      sudo apt-get update -y
+      sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+      apt-get update -y
+      apt-get install -y ca-certificates curl gnupg
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+        tee /etc/apt/sources.list.d/docker.list >/dev/null
+      apt-get update -y
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo dnf -y install dnf-plugins-core
+      sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+      sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+      dnf -y install dnf-plugins-core
+      dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+      dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo yum -y install yum-utils
+      sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      sudo yum -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    else
+      yum -y install yum-utils
+      yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      yum -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    fi
+  elif command -v apk >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apk add --no-cache docker docker-cli-compose
+    else
+      apk add --no-cache docker docker-cli-compose
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo pacman -Sy --noconfirm docker docker-compose
+    else
+      pacman -Sy --noconfirm docker docker-compose
+    fi
+  elif command -v zypper >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo zypper --non-interactive install docker docker-compose
+    else
+      zypper --non-interactive install docker docker-compose
+    fi
+  else
+    err "Unsupported OS. Please install Docker manually."
+    exit 1
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    err "Docker installation failed. Please install manually."
+    exit 1
+  fi
+}
+
+ensure_docker
 
 if docker compose version >/dev/null 2>&1; then
   COMPOSE_CMD="docker compose"
