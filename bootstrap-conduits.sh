@@ -245,11 +245,18 @@ if [ -n "$EXISTING" ]; then
   printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
   read -r -u 3 -p "Choose [1/2/3/4]: " MODE
   if [ "$MODE" = "3" ]; then
-    if [ -d grafana-data ]; then
-      read -r -u 3 -p "Backup Grafana data before CLEAN install? (y/n) [y]: " BK_GRAFANA || true
-      BK_GRAFANA=${BK_GRAFANA:-y}
-      if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
-        backup_dir "grafana-data" "grafana-data"
+if [ -d grafana-data ]; then
+  read -r -u 3 -p "Backup Grafana data before CLEAN install? (y/n) [y]: " BK_GRAFANA || true
+  BK_GRAFANA=${BK_GRAFANA:-y}
+  if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
+    backup_dir "grafana-data" "grafana-data"
+  fi
+fi
+    if [ -d prometheus-data ]; then
+      read -r -u 3 -p "Backup Prometheus data before CLEAN install? (y/n) [y]: " BK_PROM || true
+      BK_PROM=${BK_PROM:-y}
+      if [[ "$BK_PROM" =~ ^[Yy]$ ]]; then
+        backup_dir "prometheus-data" "prometheus-data"
       fi
     fi
     DELETE_GRAFANA_DATA=1
@@ -272,6 +279,13 @@ if [ -n "$EXISTING" ]; then
       BK_GRAFANA=${BK_GRAFANA:-y}
       if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
         backup_dir "grafana-data" "grafana-data"
+      fi
+    fi
+    if [ -d prometheus-data ]; then
+      read -r -u 3 -p "Backup Prometheus data before upgrade? (y/n) [y]: " BK_PROM || true
+      BK_PROM=${BK_PROM:-y}
+      if [[ "$BK_PROM" =~ ^[Yy]$ ]]; then
+        backup_dir "prometheus-data" "prometheus-data"
       fi
     fi
   elif [ "$MODE" = "4" ]; then
@@ -668,7 +682,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
-        "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
+        "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(?::.*)?\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -695,7 +709,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
-        "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
+        "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(?::.*)?\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -724,7 +738,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
-        "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
+        "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(?::.*)?\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -752,7 +766,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
-        "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
+        "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(?::.*)?\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -848,6 +862,10 @@ fi
 ########################################
 echo ""
 info "Starting stack..."
+if [ -f prometheus-data/lock ]; then
+  warn "Prometheus lock file detected; removing it to avoid startup loops."
+  rm -f prometheus-data/lock
+fi
 if [ "${UPGRADE:-0}" -eq 1 ]; then
   info "Pulling latest images..."
   $COMPOSE_CMD pull
