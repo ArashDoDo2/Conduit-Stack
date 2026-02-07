@@ -55,6 +55,29 @@ is_wsl() {
   grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
 }
 
+port_in_use() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "( sport = :$p )" 2>/dev/null | tail -n +2 | grep -q .
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$p" -sTCP:LISTEN -P -n >/dev/null 2>&1
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -tln 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]$p$"
+  else
+    return 1
+  fi
+}
+
+next_free_port() {
+  local p="$1"
+  local tries=0
+  while [ "$tries" -lt 200 ] && port_in_use "$p"; do
+    p=$((p+1))
+    tries=$((tries+1))
+  done
+  printf '%s' "$p"
+}
+
 ensure_docker() {
   if command -v docker >/dev/null 2>&1; then
     return 0
@@ -340,6 +363,36 @@ elif ! [[ "$GRAFANA_CHOICE" =~ ^[Yy]$ ]]; then
   err "Invalid Grafana choice"
   exit 1
 fi
+if [ "$ENABLE_GRAFANA" -eq 1 ]; then
+  read -r -u 3 -p "Grafana host port? [$GRAFANA_PORT]: " GRAFANA_PORT_INPUT || true
+  GRAFANA_PORT_INPUT=${GRAFANA_PORT_INPUT:-$GRAFANA_PORT}
+  GRAFANA_PORT_INPUT=$(printf '%s' "$GRAFANA_PORT_INPUT" | tr -d '[:space:]')
+  [[ "$GRAFANA_PORT_INPUT" =~ ^[0-9]+$ ]] || { err "Invalid Grafana port"; exit 1; }
+  [ "$GRAFANA_PORT_INPUT" -ge 1 ] && [ "$GRAFANA_PORT_INPUT" -le 65535 ] || { err "Invalid Grafana port"; exit 1; }
+  GRAFANA_PORT="$GRAFANA_PORT_INPUT"
+  if port_in_use "$GRAFANA_PORT"; then
+    warn "Port $GRAFANA_PORT is already in use."
+    SUGGESTED_PORT=$(next_free_port "$((GRAFANA_PORT+1))")
+    read -r -u 3 -p "Use $SUGGESTED_PORT instead? (y/n) [y]: " PORT_CONFIRM || true
+    PORT_CONFIRM=${PORT_CONFIRM:-y}
+    if [[ "$PORT_CONFIRM" =~ ^[Yy]$ ]]; then
+      GRAFANA_PORT="$SUGGESTED_PORT"
+    else
+      while :; do
+        read -r -u 3 -p "Enter an available Grafana port: " ALT_PORT || true
+        ALT_PORT=$(printf '%s' "$ALT_PORT" | tr -d '[:space:]')
+        [[ "$ALT_PORT" =~ ^[0-9]+$ ]] || { err "Invalid Grafana port"; continue; }
+        [ "$ALT_PORT" -ge 1 ] && [ "$ALT_PORT" -le 65535 ] || { err "Invalid Grafana port"; continue; }
+        if port_in_use "$ALT_PORT"; then
+          warn "Port $ALT_PORT is still in use."
+        else
+          GRAFANA_PORT="$ALT_PORT"
+          break
+        fi
+      done
+    fi
+  fi
+fi
 
 echo ""
 hr
@@ -454,31 +507,76 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
   "title": "Conduit — Clients & Traffic Volume",
   "schemaVersion": 38,
   "refresh": "5s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "liveNow": true,
   "panels": [
 
     {
       "type": "stat",
       "title": "Connected Clients (Total)",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Max Capacity",
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_max_clients)" }]
     },
     {
       "type": "stat",
       "title": "Available Slots",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "yellow" }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Is Live",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Down", "color": "red" }, "1": { "text": "Live", "color": "green" } } }
+          ]
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "min(conduit_is_live)" }]
     },
 
@@ -486,6 +584,24 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 24,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
       "targets": [{
         "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
@@ -495,6 +611,24 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 24,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
       "targets": [{
         "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
@@ -506,7 +640,23 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
-        "defaults": { "unit": "bytes" }
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 24,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
@@ -518,7 +668,23 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
-        "defaults": { "unit": "bytes" }
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 24,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "targets": [{
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
@@ -602,6 +768,10 @@ cat >> docker-compose.yml <<EOF
     restart: unless-stopped
     ports:
       - "$GRAFANA_PORT:3000"
+    environment:
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_LOG_LEVEL=warn
     volumes:
       - ./grafana-data:/var/lib/grafana
       - ./grafana-provisioning:/etc/grafana/provisioning
