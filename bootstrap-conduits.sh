@@ -696,10 +696,10 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 24,
-            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
           }
@@ -725,10 +725,10 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 24,
-            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
           }
@@ -756,10 +756,10 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 24,
-            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
           }
@@ -786,10 +786,10 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 24,
-            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 6,
+            "gradientMode": "none",
             "showPoints": "auto",
             "spanNulls": true
           }
