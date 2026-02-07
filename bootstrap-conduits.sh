@@ -68,6 +68,14 @@ port_in_use() {
   fi
 }
 
+grafana_exists() {
+  docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^grafana$'
+}
+
+grafana_host_port() {
+  docker inspect -f '{{(index (index .HostConfig.PortBindings "3000/tcp") 0).HostPort}}' grafana 2>/dev/null || true
+}
+
 next_free_port() {
   local p="$1"
   local tries=0
@@ -371,7 +379,14 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   [ "$GRAFANA_PORT_INPUT" -ge 1 ] && [ "$GRAFANA_PORT_INPUT" -le 65535 ] || { err "Invalid Grafana port"; exit 1; }
   GRAFANA_PORT="$GRAFANA_PORT_INPUT"
   if port_in_use "$GRAFANA_PORT"; then
-    warn "Port $GRAFANA_PORT is already in use."
+    EXISTING_GRAFANA_PORT=""
+    if grafana_exists; then
+      EXISTING_GRAFANA_PORT=$(grafana_host_port)
+    fi
+    if [ -n "$EXISTING_GRAFANA_PORT" ] && [ "$EXISTING_GRAFANA_PORT" = "$GRAFANA_PORT" ]; then
+      info "Port $GRAFANA_PORT already used by existing Grafana; keeping it."
+    else
+      warn "Port $GRAFANA_PORT is already in use."
     SUGGESTED_PORT=$(next_free_port "$((GRAFANA_PORT+1))")
     read -r -u 3 -p "Use $SUGGESTED_PORT instead? (y/n) [y]: " PORT_CONFIRM || true
     PORT_CONFIRM=${PORT_CONFIRM:-y}
@@ -390,6 +405,7 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
           break
         fi
       done
+    fi
     fi
   fi
 fi
