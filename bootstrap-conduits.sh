@@ -683,7 +683,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "legendFormat": "{{name}}"
+        "legendFormat": "{{name}}",
+        "instant": false,
+        "range": true
       }]
     },
     {
@@ -710,7 +712,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "legendFormat": "{{name}}"
+        "legendFormat": "{{name}}",
+        "instant": false,
+        "range": true
       }]
     },
 
@@ -739,7 +743,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "legendFormat": "{{name}}"
+        "legendFormat": "{{name}}",
+        "instant": false,
+        "range": true
       }]
     },
     {
@@ -767,7 +773,9 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       },
       "targets": [{
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "legendFormat": "{{name}}"
+        "legendFormat": "{{name}}",
+        "instant": false,
+        "range": true
       }]
     },
 
