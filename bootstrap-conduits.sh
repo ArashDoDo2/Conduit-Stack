@@ -540,7 +540,7 @@ read -r -u 3 -p "Proceed with installation? (y/n): " CONFIRM || true
 ########################################
 mkdir -p prometheus-data
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
-  mkdir -p grafana-data grafana-provisioning/{datasources,dashboards}
+  mkdir -p grafana-data grafana-provisioning/{datasources,dashboards,plugins,alerting}
 fi
 INDICES=()
 if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
@@ -713,9 +713,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "refId": "A",
         "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
-        "legendFormat": "{{name}}",
-        "instant": false,
-        "range": true
+        "legendFormat": "{{name}}"
       }]
     },
     {
@@ -744,9 +742,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "refId": "A",
         "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
-        "legendFormat": "{{name}}",
-        "instant": false,
-        "range": true
+        "legendFormat": "{{name}}"
       }]
     },
 
@@ -777,9 +773,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "refId": "A",
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
-        "legendFormat": "{{name}}",
-        "instant": false,
-        "range": true
+        "legendFormat": "{{name}}"
       }]
     },
     {
@@ -809,9 +803,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "refId": "A",
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
         "format": "time_series",
-        "legendFormat": "{{name}}",
-        "instant": false,
-        "range": true
+        "legendFormat": "{{name}}"
       }]
     },
 
