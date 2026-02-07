@@ -341,10 +341,10 @@ cat >> docker-compose.yml <<EOF
       ["start",
        "--max-clients","$MAX_CLIENTS",
        "--bandwidth","$BW_Mbps",
-       "--data-dir","/data",
+       "--data-dir","/home/conduit/data",
        "--metrics-addr","0.0.0.0:$((BASE_PORT+idx-1))"]
     volumes:
-      - ./conduit$idx-data:/data
+      - ./conduit$idx-data:/home/conduit/data
 EOF
 done
 
