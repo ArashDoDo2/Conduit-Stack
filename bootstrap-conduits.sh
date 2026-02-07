@@ -580,7 +580,6 @@ cat > grafana-provisioning/datasources/prometheus.yaml <<EOF
 apiVersion: 1
 datasources:
   - name: Prometheus
-    uid: prometheus
     type: prometheus
     access: proxy
     url: $DS_URL
@@ -625,7 +624,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Connected Clients (Total)",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "green" }
@@ -642,7 +640,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Max Capacity",
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "blue" }
@@ -659,7 +656,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Available Slots",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "yellow" }
@@ -676,7 +672,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Is Live",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -696,7 +691,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -718,6 +712,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "format": "time_series",
         "legendFormat": "{{name}}",
         "instant": false,
         "range": true
@@ -727,7 +722,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -749,6 +743,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "format": "time_series",
         "legendFormat": "{{name}}",
         "instant": false,
         "range": true
@@ -759,7 +754,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -782,6 +776,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "format": "time_series",
         "legendFormat": "{{name}}",
         "instant": false,
         "range": true
@@ -791,7 +786,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -814,6 +808,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "format": "time_series",
         "legendFormat": "{{name}}",
         "instant": false,
         "range": true
@@ -824,7 +819,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Total Uploaded (bytes)",
       "gridPos": { "x": 0, "y": 18, "w": 12, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
@@ -834,7 +828,6 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Total Downloaded (bytes)",
       "gridPos": { "x": 12, "y": 18, "w": 12, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
