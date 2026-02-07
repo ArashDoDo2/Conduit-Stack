@@ -201,14 +201,27 @@ ensure_docker() {
 
 ensure_docker
 
+COMPOSE_BASE=()
 if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD="docker compose"
+  COMPOSE_BASE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD="docker-compose"
+  COMPOSE_BASE=(docker-compose)
 else
   err "docker compose required"
   exit 1
 fi
+
+compose() {
+  # Reuse the original compose project name if the stack was created from another directory.
+  # This avoids "container name is already in use" conflicts when container_name is set.
+  if [ -n "${COMPOSE_PROJECT_NAME_OVERRIDE:-}" ]; then
+    "${COMPOSE_BASE[@]}" -p "$COMPOSE_PROJECT_NAME_OVERRIDE" "$@"
+  elif [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+    "${COMPOSE_BASE[@]}" -p "$COMPOSE_PROJECT_NAME" "$@"
+  else
+    "${COMPOSE_BASE[@]}" "$@"
+  fi
+}
 
 ########################################
 # EXISTING SETUP
@@ -232,6 +245,20 @@ if [ -n "$EXISTING_CONDUITS" ]; then
 fi
 
 if [ -n "$EXISTING" ]; then
+  # If the existing stack was started from a different directory, docker compose's default
+  # project name will differ. Reuse the old project name from compose labels to "adopt"
+  # the existing containers instead of failing with name conflicts.
+  if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      pn=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$name" 2>/dev/null || true)
+      if [ -n "$pn" ]; then
+        COMPOSE_PROJECT_NAME="$pn"
+        break
+      fi
+    done <<< "$EXISTING"
+  fi
+
   hr
   section "Existing containers detected"
   while IFS= read -r name; do
@@ -892,12 +919,12 @@ if [ -f prometheus-data/lock ]; then
 fi
 if [ "${UPGRADE:-0}" -eq 1 ]; then
   info "Pulling latest images..."
-  $COMPOSE_CMD pull
+  compose pull
 fi
 if [ "${MODE:-1}" = "2" ]; then
-  $COMPOSE_CMD up -d --remove-orphans
+  compose up -d --remove-orphans
 else
-  $COMPOSE_CMD up -d
+  compose up -d
 fi
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   ok "DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
