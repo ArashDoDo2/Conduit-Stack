@@ -328,20 +328,8 @@ fi
 [[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
 
 ########################################
-# METRICS BACKEND + GRAFANA
+# GRAFANA
 ########################################
-METRICS_BACKEND="prometheus"
-BACKEND_CHOICE=
-read -r -u 3 -p "Metrics backend? 1) Prometheus  2) VictoriaMetrics [1]: " BACKEND_CHOICE || true
-BACKEND_CHOICE=${BACKEND_CHOICE:-1}
-BACKEND_CHOICE=$(printf '%s' "$BACKEND_CHOICE" | tr -d '[:space:]')
-if [ "$BACKEND_CHOICE" = "2" ]; then
-  METRICS_BACKEND="victoriametrics"
-elif [ "$BACKEND_CHOICE" != "1" ]; then
-  err "Invalid backend choice"
-  exit 1
-fi
-
 ENABLE_GRAFANA=1
 GRAFANA_CHOICE=
 read -r -u 3 -p "Enable Grafana? (y/n) [y]: " GRAFANA_CHOICE || true
@@ -376,7 +364,6 @@ else
 fi
 printf '  %-20s %s\n' "Max clients:" "$MAX_CLIENTS per Conduit"
 printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps per client"
-printf '  %-20s %s\n' "Metrics backend:" "$METRICS_BACKEND"
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   printf '  %-20s %s\n' "Grafana:" "enabled (port $GRAFANA_PORT)"
 else
@@ -392,11 +379,7 @@ read -r -u 3 -p "Proceed with installation? (y/n): " CONFIRM || true
 ########################################
 # DIRECTORIES
 ########################################
-if [ "$METRICS_BACKEND" = "prometheus" ]; then
-  mkdir -p prometheus-data
-else
-  mkdir -p victoria-metrics-data
-fi
+mkdir -p prometheus-data
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   mkdir -p grafana-data grafana-provisioning/{datasources,dashboards}
 fi
@@ -433,11 +416,7 @@ done
 # GRAFANA DATASOURCE
 ########################################
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
-  if [ "$METRICS_BACKEND" = "prometheus" ]; then
-    DS_URL="http://prometheus:9090"
-  else
-    DS_URL="http://victoriametrics:8428"
-  fi
+  DS_URL="http://prometheus:9090"
 cat > grafana-provisioning/datasources/prometheus.yaml <<EOF
 apiVersion: 1
 datasources:
@@ -599,7 +578,6 @@ cat >> docker-compose.yml <<EOF
 
 EOF
 
-if [ "$METRICS_BACKEND" = "prometheus" ]; then
 cat >> docker-compose.yml <<EOF
   prometheus:
     image: prom/prometheus:latest
@@ -613,22 +591,6 @@ cat >> docker-compose.yml <<EOF
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
 EOF
-else
-cat >> docker-compose.yml <<EOF
-  victoriametrics:
-    image: victoriametrics/victoria-metrics:latest
-    container_name: victoriametrics
-    user: "0:0"
-    restart: unless-stopped
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./victoria-metrics-data:/victoria-metrics-data
-    command:
-      - '-promscrape.config=/etc/prometheus/prometheus.yml'
-      - '-storageDataPath=/victoria-metrics-data'
-      - '-httpListenAddr=:8428'
-EOF
-fi
 
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
 cat >> docker-compose.yml <<EOF
@@ -651,11 +613,6 @@ fi
 ########################################
 echo ""
 info "Starting stack..."
-if [ "$METRICS_BACKEND" = "prometheus" ]; then
-  docker rm -f victoriametrics >/dev/null 2>&1 || true
-else
-  docker rm -f prometheus >/dev/null 2>&1 || true
-fi
 if [ "${UPGRADE:-0}" -eq 1 ]; then
   info "Pulling latest images..."
   $COMPOSE_CMD pull
@@ -668,5 +625,5 @@ fi
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   ok "DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
 else
-  ok "DONE → Metrics backend: $METRICS_BACKEND"
+  ok "DONE → Prometheus is running"
 fi

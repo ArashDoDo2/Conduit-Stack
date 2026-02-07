@@ -13,8 +13,7 @@ deployment with correct metrics and dashboards with no manual configuration.
 
 - One-command installer (interactive, minimal questions)
 - Multiple Conduit instances (scalable)
-- Prometheus or VictoriaMetrics backend (selectable)
-- Grafana optional (pre-provisioned dashboards)
+- Prometheus + Grafana pre-configured
 - Accurate dashboards (no misleading metrics)
 - Short, readable instance names in Grafana (`conduit1`, `conduit2`, ...)
 - Configurable instance count, max clients, and bandwidth per client (Mbps)
@@ -25,8 +24,8 @@ deployment with correct metrics and dashboards with no manual configuration.
 ## What This Stack Includes
 
 - Psiphon Conduit
-- Prometheus or VictoriaMetrics (metrics collection)
-- Grafana (optional, pre-provisioned dashboards)
+- Prometheus (metrics collection)
+- Grafana (pre-provisioned dashboards)
 
 Everything runs via Docker Compose.
 
@@ -77,7 +76,6 @@ The installer will ask:
 - If you clean: how many Conduit instances to run total
 - Max clients per Conduit (default: 50)
 - Bandwidth per client in Mbps (default: 8)
-- Metrics backend (Prometheus or VictoriaMetrics)
 - Enable or disable Grafana
 - Confirmation to proceed
 
@@ -92,7 +90,7 @@ After installation (if Grafana is enabled):
 
 Change the admin password on first login.
 
-The metrics backend is not exposed on a host port by default. Grafana is the primary UI
+Prometheus is not exposed on a host port by default. Grafana is the primary UI
 for metrics.
 
 ## Dashboard Philosophy
