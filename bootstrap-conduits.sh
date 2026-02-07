@@ -185,7 +185,8 @@ if [ -n "$EXISTING" ]; then
   echo "  1) Keep existing setup (add new containers to current setup)"
   echo "  2) Upgrade in place (pull latest images, restart, keep data)"
   echo "  3) CLEAN install (remove containers + data, start fresh)"
-  read -r -u 3 -p "Choose [1/2/3]: " MODE
+  echo "  4) Modify existing setup (add or remove specific conduits)"
+  read -r -u 3 -p "Choose [1/2/3/4]: " MODE
   if [ "$MODE" = "3" ]; then
     while IFS= read -r name; do
       [ -n "$name" ] && docker rm -f "$name" || true
@@ -193,6 +194,8 @@ if [ -n "$EXISTING" ]; then
     rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
   elif [ "$MODE" = "2" ]; then
     UPGRADE=1
+  elif [ "$MODE" = "4" ]; then
+    MODIFY=1
   fi
 fi
 
@@ -207,7 +210,62 @@ echo ""
 
 COUNT=
 ADD_COUNT=
-if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
+REMOVE_IDX=()
+REMOVE_DATA=0
+if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  echo ""
+  info "Existing conduits: ${EXISTING_IDX[*]}"
+  read -r -u 3 -p "Conduit numbers to remove (comma-separated) [none]: " REMOVE_RAW || true
+  REMOVE_RAW=$(printf '%s' "$REMOVE_RAW" | tr -d '[:space:]')
+  if [ -n "$REMOVE_RAW" ]; then
+    IFS=',' read -r -a REMOVE_IDX <<< "$REMOVE_RAW"
+    for r in "${REMOVE_IDX[@]}"; do
+      [[ "$r" =~ ^[0-9]+$ ]] || { err "Invalid conduit number: $r"; exit 1; }
+      if ! printf '%s\n' "${EXISTING_IDX[@]}" | grep -qx "$r"; then
+        err "Conduit $r not found in existing setup"
+        exit 1
+      fi
+    done
+    read -r -u 3 -p "Remove data directories for selected conduits? (y/n): " REMOVE_DATA_CONFIRM || true
+    [[ "$REMOVE_DATA_CONFIRM" =~ ^[Yy]$ ]] && REMOVE_DATA=1
+  fi
+
+  read -r -u 3 -p "How many NEW Conduit instances to add? [0]: " ADD_COUNT || true
+  ADD_COUNT=${ADD_COUNT:-0}
+  ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
+  [[ "$ADD_COUNT" =~ ^[0-9]+$ ]] || { err "Invalid number"; exit 1; }
+
+  # Apply removals now to avoid conflicts
+  if [ "${#REMOVE_IDX[@]}" -gt 0 ]; then
+    for r in "${REMOVE_IDX[@]}"; do
+      docker rm -f "conduit$r" >/dev/null 2>&1 || true
+      if [ "$REMOVE_DATA" -eq 1 ]; then
+        rm -rf "conduit$r-data"
+      fi
+    done
+  fi
+
+  EXISTING_MAX_INDEX=0
+  REMAIN_IDX=()
+  for idx in "${EXISTING_IDX[@]}"; do
+    skip=0
+    for r in "${REMOVE_IDX[@]}"; do
+      [ "$idx" = "$r" ] && skip=1 && break
+    done
+    if [ "$skip" -eq 0 ]; then
+      REMAIN_IDX+=("$idx")
+      if [ "$idx" -gt "$EXISTING_MAX_INDEX" ]; then
+        EXISTING_MAX_INDEX="$idx"
+      fi
+    fi
+  done
+
+  COUNT=$((EXISTING_MAX_INDEX + ADD_COUNT))
+  if [ "$COUNT" -le 0 ]; then
+    err "No conduits selected. Aborting."
+    exit 1
+  fi
+elif [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ] && [ "${UPGRADE:-0}" -ne 1 ]; then
   read -r -u 3 -p "You currently have $EXISTING_COUNT Conduit instance(s). How many NEW to add? [0]: " ADD_COUNT || true
   ADD_COUNT=${ADD_COUNT:-0}
   ADD_COUNT=$(printf '%s' "$ADD_COUNT" | tr -d '[:space:]')
@@ -250,6 +308,11 @@ if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
   printf '  %-20s %s\n' "Adding:" "${ADD_COUNT:-0}"
   printf '  %-20s %s\n' "Total conduits:" "$COUNT"
+elif [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  printf '  %-20s %s\n' "Existing conduits:" "$EXISTING_COUNT"
+  printf '  %-20s %s\n' "Removing:" "${REMOVE_RAW:-none}"
+  printf '  %-20s %s\n' "Adding:" "${ADD_COUNT:-0}"
+  printf '  %-20s %s\n' "Total conduits:" "$COUNT"
 else
   printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
 fi
@@ -267,7 +330,10 @@ read -r -u 3 -p "Proceed with installation? (y/n): " CONFIRM || true
 ########################################
 mkdir -p prometheus-data grafana-data grafana-provisioning/{datasources,dashboards}
 INDICES=()
-if [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
+  for idx in "${REMAIN_IDX[@]}"; do INDICES+=("$idx"); done
+  for ((i=EXISTING_MAX_INDEX+1; i<=COUNT; i++)); do INDICES+=("$i"); done
+elif [ "${MODE:-1}" = "1" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   for idx in "${EXISTING_IDX[@]}"; do INDICES+=("$idx"); done
   for ((i=EXISTING_MAX_INDEX+1; i<=COUNT; i++)); do INDICES+=("$i"); done
 else
