@@ -2,6 +2,9 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.25]
+- Fixed hub CPU/RAM graphs by targeting local `node-exporter` via service name.
+
 ## [2026.02.08.23]
 - Added node-exporter based system metrics panels:
   - `CPU Usage % per Server`

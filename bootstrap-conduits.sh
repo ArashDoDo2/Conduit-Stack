@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.23"
+STACK_VERSION="2026.02.08.25"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -75,6 +75,8 @@ TARGETS_FILE="./targets.json"
 TARGETS_FILE_CONTAINER="/etc/prometheus/targets.json"
 NODE_EXPORTER_USER="node"
 NODE_EXPORTER_PASSWORD_FILE="./node-exporter-password"
+NODE_EXPORTER_WEB_DIR="./node-exporter"
+NODE_EXPORTER_WEB_FILE="./node-exporter/web.yml"
 HUB_IP_FILE="./hub-ip"
 
 ########################################
@@ -1351,6 +1353,7 @@ for idx in "${INDICES[@]}"; do
   LOCAL_TARGETS+=("conduit$idx:$((BASE_PORT+idx-1))")
 done
 update_target_group "$HUB_ALIAS" "conduit" "${LOCAL_TARGETS[@]}"
+update_target_group "$HUB_ALIAS" "node" "node-exporter:9100"
 migrate_targets_conduit_labels
 generate_client_script "$HUB_IP" "$NODE_EXPORTER_PASSWORD"
 
@@ -1383,6 +1386,16 @@ scrape_configs:
       - source_labels: [role]
         regex: node
         action: keep
+EOF
+
+########################################
+# NODE-EXPORTER CONFIG (HUB)
+########################################
+mkdir -p "$NODE_EXPORTER_WEB_DIR"
+HASH=$(bcrypt_hash "$NODE_EXPORTER_PASSWORD")
+cat > "$NODE_EXPORTER_WEB_FILE" <<EOF
+basic_auth_users:
+  $NODE_EXPORTER_USER: $HASH
 EOF
 
 ########################################
@@ -1723,6 +1736,20 @@ fi
 ########################################
 cat > docker-compose.yml <<EOF
 services:
+EOF
+
+cat >> docker-compose.yml <<EOF
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    user: "0:0"
+    restart: unless-stopped
+    command:
+      - '--web.config.file=/etc/node-exporter/web.yml'
+    ports:
+      - "9100:9100"
+    volumes:
+      - $NODE_EXPORTER_WEB_FILE:/etc/node-exporter/web.yml:ro
 EOF
 
 for idx in "${INDICES[@]}"; do
