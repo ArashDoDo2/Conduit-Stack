@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.2"
+STACK_VERSION="2026.02.08.3"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -328,13 +328,16 @@ ensure_docker() {
 }
 
 bcrypt_hash() {
-  if command -v openssl >/dev/null 2>&1; then
+  if command -v openssl >/dev/null 2>&1 && printf 'test' | openssl passwd -bcrypt -stdin >/dev/null 2>&1; then
     printf '%s' "$1" | openssl passwd -bcrypt -stdin
   elif command -v python3 >/dev/null 2>&1; then
     python3 - "$1" <<'PY'
 import crypt, sys
 pw=sys.argv[1]
-print(crypt.crypt(pw, crypt.mksalt(crypt.METHOD_BLOWFISH)))
+method=getattr(crypt, "METHOD_BLOWFISH", None)
+if method is None:
+    raise SystemExit("python3 crypt does not support bcrypt (METHOD_BLOWFISH missing)")
+print(crypt.crypt(pw, crypt.mksalt(method)))
 PY
   else
     err "Need openssl or python3 to generate bcrypt hash."
