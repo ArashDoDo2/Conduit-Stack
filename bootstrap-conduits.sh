@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.26"
+STACK_VERSION="2026.02.08.27"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -157,22 +157,74 @@ random_password() {
   fi
 }
 
+ensure_python_bcrypt() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  if python3 -c 'import bcrypt' >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apt-get update -y >/dev/null 2>&1 || true
+      sudo apt-get install -y python3-bcrypt >/dev/null 2>&1 || true
+    else
+      apt-get update -y >/dev/null 2>&1 || true
+      apt-get install -y python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo dnf -y install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      dnf -y install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo yum -y install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      yum -y install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v apk >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apk add --no-cache py3-bcrypt >/dev/null 2>&1 || true
+    else
+      apk add --no-cache py3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo pacman -Sy --noconfirm python-bcrypt >/dev/null 2>&1 || true
+    else
+      pacman -Sy --noconfirm python-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v zypper >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo zypper --non-interactive install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      zypper --non-interactive install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  fi
+
+  python3 -c 'import bcrypt' >/dev/null 2>&1
+}
+
 bcrypt_hash() {
   if command -v openssl >/dev/null 2>&1 && printf 'test' | openssl passwd -bcrypt -stdin >/dev/null 2>&1; then
     printf '%s' "$1" | openssl passwd -bcrypt -stdin
-  elif command -v python3 >/dev/null 2>&1; then
-    python3 - "$1" <<'PY'
-import crypt, sys
-pw=sys.argv[1]
-method=getattr(crypt, "METHOD_BLOWFISH", None)
-if method is None:
-    raise SystemExit("python3 crypt does not support bcrypt (METHOD_BLOWFISH missing)")
-print(crypt.crypt(pw, crypt.mksalt(method)))
-PY
-  else
-    err "Need openssl or python3 to generate bcrypt hash."
-    exit 1
+    return 0
   fi
+
+  if ensure_python_bcrypt; then
+    python3 - "$1" <<'PY'
+import bcrypt, sys
+pw=sys.argv[1].encode("utf-8")
+print(bcrypt.hashpw(pw, bcrypt.gensalt(rounds=12)).decode("utf-8"))
+PY
+    return 0
+  fi
+
+  err "Need bcrypt support. Install one of: openssl(with -bcrypt) or python3-bcrypt."
+  exit 1
 }
 
 ensure_node_exporter_password() {
@@ -392,22 +444,74 @@ ensure_docker() {
   fi
 }
 
+ensure_python_bcrypt() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 1
+  fi
+  if python3 -c 'import bcrypt' >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apt-get update -y >/dev/null 2>&1 || true
+      sudo apt-get install -y python3-bcrypt >/dev/null 2>&1 || true
+    else
+      apt-get update -y >/dev/null 2>&1 || true
+      apt-get install -y python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v dnf >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo dnf -y install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      dnf -y install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v yum >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo yum -y install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      yum -y install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v apk >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo apk add --no-cache py3-bcrypt >/dev/null 2>&1 || true
+    else
+      apk add --no-cache py3-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v pacman >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo pacman -Sy --noconfirm python-bcrypt >/dev/null 2>&1 || true
+    else
+      pacman -Sy --noconfirm python-bcrypt >/dev/null 2>&1 || true
+    fi
+  elif command -v zypper >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo zypper --non-interactive install python3-bcrypt >/dev/null 2>&1 || true
+    else
+      zypper --non-interactive install python3-bcrypt >/dev/null 2>&1 || true
+    fi
+  fi
+
+  python3 -c 'import bcrypt' >/dev/null 2>&1
+}
+
 bcrypt_hash() {
   if command -v openssl >/dev/null 2>&1 && printf 'test' | openssl passwd -bcrypt -stdin >/dev/null 2>&1; then
     printf '%s' "$1" | openssl passwd -bcrypt -stdin
-  elif command -v python3 >/dev/null 2>&1; then
-    python3 - "$1" <<'PY'
-import crypt, sys
-pw=sys.argv[1]
-method=getattr(crypt, "METHOD_BLOWFISH", None)
-if method is None:
-    raise SystemExit("python3 crypt does not support bcrypt (METHOD_BLOWFISH missing)")
-print(crypt.crypt(pw, crypt.mksalt(method)))
-PY
-  else
-    err "Need openssl or python3 to generate bcrypt hash."
-    exit 1
+    return 0
   fi
+
+  if ensure_python_bcrypt; then
+    python3 - "$1" <<'PY'
+import bcrypt, sys
+pw=sys.argv[1].encode("utf-8")
+print(bcrypt.hashpw(pw, bcrypt.gensalt(rounds=12)).decode("utf-8"))
+PY
+    return 0
+  fi
+
+  err "Need bcrypt support. Install one of: openssl(with -bcrypt) or python3-bcrypt."
+  exit 1
 }
 
 MODE=$(detect_deploy_mode)
