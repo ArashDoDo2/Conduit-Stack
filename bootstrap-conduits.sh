@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.9"
+STACK_VERSION="2026.02.08.11"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1319,30 +1319,74 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
   "schemaVersion": 38,
   "refresh": "5s",
   "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "graphTooltip": 1,
   "panels": [
 
     {
       "type": "stat",
       "title": "Connected Clients (Total)",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Max Capacity",
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_max_clients)" }]
     },
     {
       "type": "stat",
       "title": "Available Slots",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "yellow" }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Is Live",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Down", "color": "red" }, "1": { "text": "Live", "color": "green" } } }
+          ]
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "min(conduit_is_live)" }]
     },
 
@@ -1350,6 +1394,23 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connected Clients per Server",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
       "targets": [{
         "expr": "sum by(alias) (conduit_connected_clients)",
         "legendFormat": "{{alias}}"
@@ -1359,6 +1420,23 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Server",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
       "targets": [{
         "expr": "sum by(alias) (conduit_connecting_clients)",
         "legendFormat": "{{alias}}"
@@ -1371,8 +1449,21 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
         }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
         "expr": "sum by(alias) (conduit_bytes_uploaded)",
@@ -1385,8 +1476,21 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
         }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
         "expr": "sum by(alias) (conduit_bytes_downloaded)",
@@ -1398,12 +1502,28 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "stat",
       "title": "Server Count",
       "gridPos": { "x": 0, "y": 18, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "teal" } }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "count(count by(alias) (conduit_is_live))" }]
     },
     {
       "type": "stat",
       "title": "Total Conduits",
       "gridPos": { "x": 6, "y": 18, "w": 6, "h": 4 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" } }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
       "targets": [{ "expr": "count(conduit_is_live)" }]
     },
     {
