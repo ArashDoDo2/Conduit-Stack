@@ -1151,122 +1151,40 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
   "title": "Conduit — Clients & Traffic Volume",
   "schemaVersion": 38,
   "refresh": "5s",
-  "time": { "from": "now-24h", "to": "now" },
-  "timezone": "browser",
-  "graphTooltip": 1,
-  "liveNow": true,
-  "templating": {
-    "list": [
-      {
-        "name": "server",
-        "type": "query",
-        "label": "Instance/Alias",
-        "datasource": "Prometheus",
-        "refresh": 1,
-        "query": "label_values(conduit_connected_clients, alias)",
-        "includeAll": true,
-        "multi": false,
-        "allValue": ".*"
-      }
-    ]
-  },
+  "time": { "from": "now-1h", "to": "now" },
   "panels": [
 
     {
       "type": "stat",
       "title": "Connected Clients (Total)",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "green" }
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center"
-      },
-      "targets": [{ "refId": "A", "expr": "sum(conduit_connected_clients{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Max Capacity",
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "blue" }
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center"
-      },
-      "targets": [{ "refId": "A", "expr": "sum(conduit_max_clients{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "sum(conduit_max_clients)" }]
     },
     {
       "type": "stat",
       "title": "Available Slots",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "yellow" }
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center"
-      },
-      "targets": [{ "refId": "A", "expr": "sum(conduit_max_clients{alias=~\"$server\"}) - sum(conduit_connected_clients{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
     },
     {
       "type": "stat",
       "title": "Is Live",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "Down", "color": "red" }, "1": { "text": "Live", "color": "green" } } }
-          ]
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center"
-      },
-      "targets": [{ "refId": "A", "expr": "min(conduit_is_live{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "min(conduit_is_live)" }]
     },
 
     {
       "type": "timeseries",
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
-      "maxDataPoints": 600,
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "showPoints": "auto",
-            "spanNulls": true
-          }
-        }
-      },
-      "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
       "targets": [{
-        "refId": "A",
-        "expr": "label_replace(avg_over_time(conduit_connected_clients{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "interval": "1m",
-        "format": "time_series",
+        "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -1274,30 +1192,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
-      "maxDataPoints": 600,
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "showPoints": "auto",
-            "spanNulls": true
-          }
-        }
-      },
-      "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
       "targets": [{
-        "refId": "A",
-        "expr": "label_replace(avg_over_time(conduit_connecting_clients{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "interval": "1m",
-        "format": "time_series",
+        "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -1306,31 +1202,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
-      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "showPoints": "auto",
-            "spanNulls": true
-          }
+          "unit": "bytes"
         }
       },
-      "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
       "targets": [{
-        "refId": "A",
-        "expr": "label_replace(avg_over_time(conduit_bytes_uploaded{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "interval": "1m",
-        "format": "time_series",
+        "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -1338,31 +1216,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
-      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "showPoints": "auto",
-            "spanNulls": true
-          }
+          "unit": "bytes"
         }
       },
-      "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "top" },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
       "targets": [{
-        "refId": "A",
-        "expr": "label_replace(avg_over_time(conduit_bytes_downloaded{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
-        "interval": "1m",
-        "format": "time_series",
+        "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
         "legendFormat": "{{name}}"
       }]
     },
@@ -1374,7 +1234,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
-      "targets": [{ "refId": "A", "expr": "sum(conduit_bytes_uploaded{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "sum(conduit_bytes_uploaded)" }]
     },
     {
       "type": "stat",
@@ -1383,7 +1243,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
-      "targets": [{ "refId": "A", "expr": "sum(conduit_bytes_downloaded{alias=~\"$server\"})" }]
+      "targets": [{ "expr": "sum(conduit_bytes_downloaded)" }]
     }
   ]
 }
