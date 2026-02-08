@@ -44,12 +44,14 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
+STACK_VERSION="2026.02.08.1"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
 WEB_PORT=8088
 WEB_DIR="./web"
 WEB_PORT_FILE="./web-port"
+VERSION_FILE="./stack-version"
 TARGETS_FILE="./targets.json"
 TARGETS_FILE_CONTAINER="/etc/prometheus/targets.json"
 NODE_EXPORTER_USER="node"
@@ -555,6 +557,7 @@ add_remote_client() {
 hr
 title "Conduit Stack Installer"
 hr
+info "Version: $STACK_VERSION"
 info "Choose an action:"
 printf '  %b1%b) Setup Hub %b(Prometheus + Grafana + Web installer)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
 printf '  %b2%b) Add Remote Client %b(append targets + generate install command)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
@@ -1056,6 +1059,8 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
 fi
 mkdir -p "$WEB_DIR"
 printf '%s' "$WEB_PORT" > "$WEB_PORT_FILE"
+printf '%s\n' "$STACK_VERSION" > "$VERSION_FILE"
+printf 'version=%s\nupdated_at=%s\n' "$STACK_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WEB_DIR/version.txt"
 NODE_EXPORTER_PASSWORD=$(ensure_node_exporter_password)
 HUB_IP=$(ensure_hub_ip)
 INDICES=()
@@ -1346,8 +1351,11 @@ else
   compose up -d
 fi
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
-  ok "DONE → Grafana http://<server-ip>:$GRAFANA_PORT"
+  ok "DONE → Grafana http://$HUB_IP:$GRAFANA_PORT"
 else
   ok "DONE → Prometheus is running"
 fi
-ok "DONE → Client installer http://<server-ip>:$WEB_PORT/install-client.sh"
+ok "DONE → Client installer http://$HUB_IP:$WEB_PORT/install-client.sh"
+info "Run this on a client (copy/paste):"
+printf '  curl -fsSL http://%s:%s/install-client.sh | bash\n' "$HUB_IP" "$WEB_PORT"
+ok "DONE → Stack version $STACK_VERSION"
