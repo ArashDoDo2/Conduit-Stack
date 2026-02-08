@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.21]
+- Disabled legends on main timeseries panels to remove per-panel scrolling with many servers.
+- Timeseries remain readable via tooltip values on hover.
+
 ## [2026.02.08.20]
 - Fixed back-to-main restart in existing-setup menu when script is launched as `bash bootstrap-conduits.sh`.
 - Replaced `exec "$0"` with an absolute script path restart.

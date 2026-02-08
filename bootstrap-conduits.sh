@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.20"
+STACK_VERSION="2026.02.08.21"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1518,7 +1518,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
+        "legend": { "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1544,7 +1544,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
+        "legend": { "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1572,7 +1572,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
+        "legend": { "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1599,7 +1599,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
+        "legend": { "showLegend": false },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
