@@ -1243,6 +1243,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
+      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -1264,6 +1265,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(avg_over_time(conduit_connected_clients{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "interval": "1m",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -1272,6 +1274,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
+      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -1293,6 +1296,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(avg_over_time(conduit_connecting_clients{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "interval": "1m",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -1302,6 +1306,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Uploaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
+      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -1324,6 +1329,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(avg_over_time(conduit_bytes_uploaded{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "interval": "1m",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
@@ -1332,6 +1338,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "type": "timeseries",
       "title": "Downloaded Bytes per Conduit (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
+      "maxDataPoints": 600,
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -1354,6 +1361,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{
         "refId": "A",
         "expr": "label_replace(avg_over_time(conduit_bytes_downloaded{alias=~\"$server\"}[1m]),\"name\",\"$1\",\"instance\",\"([^:]+)(:.*)?\")",
+        "interval": "1m",
         "format": "time_series",
         "legendFormat": "{{name}}"
       }]
