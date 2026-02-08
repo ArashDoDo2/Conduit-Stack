@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.22"
+STACK_VERSION="2026.02.08.23"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1609,9 +1609,68 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     },
 
     {
+      "type": "timeseries",
+      "title": "CPU Usage % per Server",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "100 * (1 - avg by(alias) (rate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])))",
+        "legendFormat": "{{alias}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage % per Server",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "100 * (1 - (avg by(alias) (node_memory_MemAvailable_bytes{job=\"node\"}) / avg by(alias) (node_memory_MemTotal_bytes{job=\"node\"})))",
+        "legendFormat": "{{alias}}"
+      }]
+    },
+
+    {
       "type": "stat",
       "title": "Server Count",
-      "gridPos": { "x": 0, "y": 24, "w": 6, "h": 4 },
+      "gridPos": { "x": 0, "y": 34, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "teal" } }
       },
@@ -1625,7 +1684,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Conduits",
-      "gridPos": { "x": 6, "y": 24, "w": 6, "h": 4 },
+      "gridPos": { "x": 6, "y": 34, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" } }
       },
@@ -1639,7 +1698,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Uploaded (All Servers)",
-      "gridPos": { "x": 12, "y": 24, "w": 6, "h": 4 },
+      "gridPos": { "x": 12, "y": 34, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
@@ -1648,7 +1707,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Downloaded (All Servers)",
-      "gridPos": { "x": 18, "y": 24, "w": 6, "h": 4 },
+      "gridPos": { "x": 18, "y": 34, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },

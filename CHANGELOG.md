@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.23]
+- Added node-exporter based system metrics panels:
+  - `CPU Usage % per Server`
+  - `Memory Usage % per Server`
+- Shifted summary stat row down to fit the new CPU/RAM graphs.
+
 ## [2026.02.08.22]
 - Restored bottom table legends on timeseries panels (`lastNotNull`, `max`).
 - Increased timeseries panel heights to reduce legend scrolling.
