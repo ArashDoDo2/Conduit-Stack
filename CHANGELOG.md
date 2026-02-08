@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.22]
+- Restored bottom table legends on timeseries panels (`lastNotNull`, `max`).
+- Increased timeseries panel heights to reduce legend scrolling.
+- Shifted lower stat row down to keep dashboard layout aligned.
+
 ## [2026.02.08.21]
 - Disabled legends on main timeseries panels to remove per-panel scrolling with many servers.
 - Timeseries remain readable via tooltip values on hover.

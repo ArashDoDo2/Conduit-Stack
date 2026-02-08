@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.21"
+STACK_VERSION="2026.02.08.22"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1503,7 +1503,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "timeseries",
       "title": "Connected Clients per Server",
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 10 },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1518,7 +1518,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": false },
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1529,7 +1529,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "timeseries",
       "title": "Connecting Clients per Server",
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 10 },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1544,7 +1544,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": false },
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1556,7 +1556,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "timeseries",
       "title": "Uploaded Bytes per Server (cumulative)",
-      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 10 },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -1572,7 +1572,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": false },
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1583,7 +1583,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "timeseries",
       "title": "Downloaded Bytes per Server (cumulative)",
-      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 10 },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -1599,7 +1599,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "options": {
-        "legend": { "showLegend": false },
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
       },
       "targets": [{
@@ -1611,7 +1611,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Server Count",
-      "gridPos": { "x": 0, "y": 20, "w": 6, "h": 4 },
+      "gridPos": { "x": 0, "y": 24, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "teal" } }
       },
@@ -1625,7 +1625,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Conduits",
-      "gridPos": { "x": 6, "y": 20, "w": 6, "h": 4 },
+      "gridPos": { "x": 6, "y": 24, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" } }
       },
@@ -1639,7 +1639,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Uploaded (All Servers)",
-      "gridPos": { "x": 12, "y": 20, "w": 6, "h": 4 },
+      "gridPos": { "x": 12, "y": 24, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
@@ -1648,7 +1648,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Downloaded (All Servers)",
-      "gridPos": { "x": 18, "y": 20, "w": 6, "h": 4 },
+      "gridPos": { "x": 18, "y": 24, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
