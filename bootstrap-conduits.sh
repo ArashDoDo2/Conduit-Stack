@@ -39,12 +39,18 @@ warn() { printf '%b\n' "${C_YELLOW}$*${C_RESET}"; }
 err() { printf '%b\n' "${C_RED}$*${C_RESET}"; }
 title() { printf '%b\n' "${C_BOLD}$*${C_RESET}"; }
 section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
+is_back_choice() {
+  case "$1" in
+    b|B|back|Back|BACK) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 ########################################
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.7"
+STACK_VERSION="2026.02.08.8"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -572,33 +578,40 @@ add_remote_client() {
   node_pw=$(cat "$NODE_EXPORTER_PASSWORD_FILE")
   hub_ip=$(ensure_hub_ip)
   web_port=$(cat "$WEB_PORT_FILE" 2>/dev/null || printf '%s' "$WEB_PORT")
+  info "Type 'b' to go back to main menu."
 
   read -r -u 3 -p "Slave server name/alias: " client_alias || true
   client_alias=$(printf '%s' "$client_alias" | tr -d '[:space:]')
+  is_back_choice "$client_alias" && return 10
   [ -n "$client_alias" ] || { err "Slave server name is required."; exit 1; }
 
   read -r -u 3 -p "Slave server IP/DNS: " client_ip || true
   client_ip=$(printf '%s' "$client_ip" | tr -d '[:space:]')
+  is_back_choice "$client_ip" && return 10
   [ -n "$client_ip" ] || { err "Slave server IP/DNS is required."; exit 1; }
 
   read -r -u 3 -p "How many Conduit instances on slave server? [1]: " count || true
   count=${count:-1}
   count=$(printf '%s' "$count" | tr -d '[:space:]')
+  is_back_choice "$count" && return 10
   [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -gt 0 ] || { err "Invalid number"; exit 1; }
 
   read -r -u 3 -p "Slave server base metrics port? [$BASE_PORT]: " base_port || true
   base_port=${base_port:-$BASE_PORT}
   base_port=$(printf '%s' "$base_port" | tr -d '[:space:]')
+  is_back_choice "$base_port" && return 10
   [[ "$base_port" =~ ^[0-9]+$ ]] && [ "$base_port" -ge 1 ] && [ "$base_port" -le 65535 ] || { err "Invalid base port"; exit 1; }
 
   read -r -u 3 -p "Max clients per Conduit on slave server? [50]: " max_clients || true
   max_clients=${max_clients:-50}
   max_clients=$(printf '%s' "$max_clients" | tr -d '[:space:]')
+  is_back_choice "$max_clients" && return 10
   [[ "$max_clients" =~ ^[0-9]+$ ]] && [ "$max_clients" -gt 0 ] || { err "Invalid max clients"; exit 1; }
 
   read -r -u 3 -p "Bandwidth per client (Mbps) on slave server? [8]: " bw_mbps || true
   bw_mbps=${bw_mbps:-8}
   bw_mbps=$(printf '%s' "$bw_mbps" | tr -d '[:space:]')
+  is_back_choice "$bw_mbps" && return 10
   [[ "$bw_mbps" =~ ^[0-9]+$ ]] && [ "$bw_mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
 
   append_client_targets "$client_alias" "$client_ip" "$base_port" "$count"
@@ -653,9 +666,11 @@ PY
     printf '  %d) %s\n' "$i" "$alias"
     i=$((i+1))
   done
+  info "Type 'b' to go back to main menu."
 
   read -r -u 3 -p "Choose number to remove (or type alias): " choice || true
   choice=$(printf '%s' "$choice" | tr -d '[:space:]')
+  is_back_choice "$choice" && return 10
   if [[ "$choice" =~ ^[0-9]+$ ]]; then
     [ "$choice" -ge 1 ] && [ "$choice" -le "${#ALIASES[@]}" ] || { err "Invalid selection."; exit 1; }
     alias="${ALIASES[$((choice-1))]}"
@@ -684,31 +699,33 @@ PY
   info "Prometheus will stop scraping it automatically."
 }
 
-hr
-title "Conduit Stack Installer"
-hr
-info "Version: $STACK_VERSION"
-info "Choose an action:"
-printf '  %b1%b) Setup Hub %b(Prometheus + Grafana + Web installer)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-printf '  %b2%b) Add Slave Server %b(append targets + generate install command)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-printf '  %b3%b) Remove Slave Server %b(remove targets by alias)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-read -r -u 3 -p "Choose [1/2/3]: " MAIN_MODE || true
-case "$MAIN_MODE" in
-  1|"") MAIN_MODE="hub" ;;
-  2) MAIN_MODE="add-slave" ;;
-  3) MAIN_MODE="remove-slave" ;;
-  *) err "Invalid selection"; exit 1 ;;
-esac
-
-if [ "$MAIN_MODE" = "add-slave" ]; then
-  add_remote_client
-  exit 0
-fi
-
-if [ "$MAIN_MODE" = "remove-slave" ]; then
-  remove_remote_client
-  exit 0
-fi
+while :; do
+  hr
+  title "Conduit Stack Installer"
+  hr
+  info "Version: $STACK_VERSION"
+  info "Choose an action:"
+  printf '  %b1%b) Setup Hub %b(Prometheus + Grafana + Web installer)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '  %b2%b) Add Slave Server %b(append targets + generate install command)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  printf '  %b3%b) Remove Slave Server %b(remove targets by alias)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+  read -r -u 3 -p "Choose [1/2/3]: " MAIN_MODE || true
+  case "$MAIN_MODE" in
+    1|"") MAIN_MODE="hub"; break ;;
+    2)
+      add_remote_client
+      rc=$?
+      [ "$rc" -eq 10 ] && continue
+      exit "$rc"
+      ;;
+    3)
+      remove_remote_client
+      rc=$?
+      [ "$rc" -eq 10 ] && continue
+      exit "$rc"
+      ;;
+    *) err "Invalid selection" ;;
+  esac
+done
 
 ensure_docker() {
   if command -v docker >/dev/null 2>&1; then
