@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.3"
+STACK_VERSION="2026.02.08.4"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -470,9 +470,56 @@ if os.path.exists(path):
     if raw:
       data=json.loads(raw)
 data=[g for g in data if not (g.get("labels",{}).get("alias")==alias and g.get("labels",{}).get("role")==role)]
-data.append({"targets": targets, "labels": {"alias": alias, "role": role}})
+if role == "conduit":
+  for t in targets:
+    host=t.split(":",1)[0]
+    conduit=host if host.startswith("conduit") else host
+    data.append({"targets": [t], "labels": {"alias": alias, "role": role, "conduit": conduit}})
+else:
+  data.append({"targets": targets, "labels": {"alias": alias, "role": role}})
 with open(path, "w") as f:
   json.dump(data, f, indent=2)
+PY
+}
+
+migrate_targets_conduit_labels() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    err "python3 is required to migrate $TARGETS_FILE"
+    exit 1
+  fi
+  python3 - "$TARGETS_FILE" <<'PY'
+import json, os, sys
+path=sys.argv[1]
+if not os.path.exists(path):
+  raise SystemExit(0)
+with open(path, "r") as f:
+  raw=f.read().strip()
+  if not raw:
+    raise SystemExit(0)
+  data=json.loads(raw)
+out=[]
+changed=False
+for g in data:
+  labels=dict(g.get("labels", {}))
+  role=labels.get("role")
+  targets=list(g.get("targets", []))
+  if role=="conduit" and "conduit" not in labels and targets:
+    changed=True
+    if len(targets)==1:
+      t=targets[0]
+      host=t.split(":",1)[0]
+      labels["conduit"]=host if host.startswith("conduit") else "conduit1"
+      out.append({"targets":[t], "labels":labels})
+    else:
+      for i, t in enumerate(targets, start=1):
+        nl=dict(labels)
+        nl["conduit"]=f"conduit{i}"
+        out.append({"targets":[t], "labels":nl})
+  else:
+    out.append(g)
+if changed:
+  with open(path, "w") as f:
+    json.dump(out, f, indent=2)
 PY
 }
 
@@ -503,7 +550,8 @@ for g in data:
   if labels.get("alias")==alias:
     raise SystemExit(f"Alias already exists: {alias}")
 conduit_targets=[f"{ip}:{base_port+i}" for i in range(count)]
-data.append({"targets": conduit_targets, "labels": {"alias": alias, "role": "conduit"}})
+for i, t in enumerate(conduit_targets, start=1):
+  data.append({"targets": [t], "labels": {"alias": alias, "role": "conduit", "conduit": f"conduit{i}"}})
 data.append({"targets": [f"{ip}:9100"], "labels": {"alias": alias, "role": "node"}})
 with open(path, "w") as f:
   json.dump(data, f, indent=2)
@@ -554,6 +602,7 @@ add_remote_client() {
   [[ "$bw_mbps" =~ ^[0-9]+$ ]] && [ "$bw_mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
 
   append_client_targets "$client_alias" "$client_ip" "$base_port" "$count"
+  migrate_targets_conduit_labels
   generate_client_script "$hub_ip" "$node_pw"
 
   hr
@@ -1097,6 +1146,7 @@ for idx in "${INDICES[@]}"; do
   LOCAL_TARGETS+=("conduit$idx:$((BASE_PORT+idx-1))")
 done
 update_target_group "$HUB_ALIAS" "conduit" "${LOCAL_TARGETS[@]}"
+migrate_targets_conduit_labels
 generate_client_script "$HUB_IP" "$NODE_EXPORTER_PASSWORD"
 
 ########################################
@@ -1206,8 +1256,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "title": "Connected Clients per Conduit",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "label_replace(conduit_connected_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
-        "legendFormat": "{{name}}"
+        "expr": "conduit_connected_clients",
+        "legendFormat": "{{alias}}/{{conduit}}"
       }]
     },
     {
@@ -1215,8 +1265,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "title": "Connecting Clients per Conduit",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "label_replace(conduit_connecting_clients,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
-        "legendFormat": "{{name}}"
+        "expr": "conduit_connecting_clients",
+        "legendFormat": "{{alias}}/{{conduit}}"
       }]
     },
 
@@ -1230,8 +1280,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "targets": [{
-        "expr": "label_replace(conduit_bytes_uploaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
-        "legendFormat": "{{name}}"
+        "expr": "conduit_bytes_uploaded",
+        "legendFormat": "{{alias}}/{{conduit}}"
       }]
     },
     {
@@ -1244,8 +1294,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "targets": [{
-        "expr": "label_replace(conduit_bytes_downloaded,\"name\",\"$1\",\"instance\",\"([^:]+):.*\")",
-        "legendFormat": "{{name}}"
+        "expr": "conduit_bytes_downloaded",
+        "legendFormat": "{{alias}}/{{conduit}}"
       }]
     },
 
