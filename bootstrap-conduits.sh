@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.17"
+STACK_VERSION="2026.02.08.18"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -980,7 +980,13 @@ if [ -n "$EXISTING" ]; then
     printf '  %b2%b) Upgrade in place %b(pull latest images, restart, keep data)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
     printf '  %b3%b) CLEAN install %b(remove containers + data, start fresh)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
     printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-    read -r -u 3 -p "Choose [1/2/3/4]: " MODE
+    info "Type 'b' to return to main menu."
+    read -r -u 3 -p "Choose [1/2/3/4/b]: " MODE
+    MODE=$(printf '%s' "$MODE" | tr -d '[:space:]')
+    if is_back_choice "$MODE"; then
+      info "Returning to main menu..."
+      exec "$0"
+    fi
     if [ "$MODE" = "3" ]; then
 if [ -d grafana-data ]; then
   read -r -u 3 -p "Backup Grafana data before CLEAN install? (y/n) [y]: " BK_GRAFANA || true

@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.18]
+- Added `b/back` option to the existing-setup (upgrade/keep/clean/modify) menu.
+- Selecting `b` now returns to the main installer menu.
+
 ## [2026.02.08.17]
 - Increased timeseries panel heights in Grafana dashboard.
 - Moved legends from bottom table view to right-side list view.
