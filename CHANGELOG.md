@@ -5,6 +5,10 @@ All notable changes to this project are documented in this file.
 ## [2026.02.08.25]
 - Fixed hub CPU/RAM graphs by targeting local `node-exporter` via service name.
 
+## [2026.02.08.26]
+- Fixed Hub install failure `bcrypt_hash: command not found`.
+- Added global `bcrypt_hash()` in main script scope for hub node-exporter config generation.
+
 ## [2026.02.08.23]
 - Added node-exporter based system metrics panels:
   - `CPU Usage % per Server`
