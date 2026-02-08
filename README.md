@@ -129,6 +129,53 @@ Notes:
 - Grafana: `http://<hub-ip>:<grafana-port>`
 - Slave installer: `http://<hub-ip>:<web-port>/install-client.sh`
 
+## Operator Cheat Sheet
+
+Run installer:
+
+```bash
+bash bootstrap-conduits.sh
+```
+
+Update script from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh
+```
+
+Apply latest dashboard/config changes on hub:
+
+```bash
+bash bootstrap-conduits.sh
+# Setup Hub -> Keep existing setup -> Proceed = y
+```
+
+Add slave server target from hub:
+
+```bash
+bash bootstrap-conduits.sh
+# Add Slave Server
+```
+
+Remove slave server target from hub:
+
+```bash
+bash bootstrap-conduits.sh
+# Remove Slave Server
+```
+
+Upgrade existing slave conduits only (keep data):
+
+```bash
+curl -fsSL http://<hub-ip>:<web-port>/install-client.sh | bash -s -- --upgrade
+```
+
+Check current script version:
+
+```bash
+grep -n '^STACK_VERSION=' bootstrap-conduits.sh
+```
+
 ## Applying New Dashboard Changes (Recommended Checklist)
 
 After pulling newer script code on hub:
