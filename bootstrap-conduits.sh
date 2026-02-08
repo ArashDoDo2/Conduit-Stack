@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.14"
+STACK_VERSION="2026.02.08.15"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -193,6 +193,7 @@ COUNT=""
 BASE_PORT=""
 MAX_CLIENTS=""
 BW_Mbps=""
+UPGRADE_ONLY=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -200,6 +201,7 @@ while [ "$#" -gt 0 ]; do
     --base-port) BASE_PORT="$2"; shift 2 ;;
     --max-clients) MAX_CLIENTS="$2"; shift 2 ;;
     --bandwidth) BW_Mbps="$2"; shift 2 ;;
+    --upgrade) UPGRADE_ONLY=1; shift ;;
     *) err "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -209,13 +211,15 @@ BASE_PORT=${BASE_PORT:-$BASE_PORT_DEFAULT}
 MAX_CLIENTS=${MAX_CLIENTS:-50}
 BW_Mbps=${BW_Mbps:-8}
 
-if [ -z "$COUNT" ]; then
-  if [ -r /dev/tty ]; then
-    read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
+if [ "$UPGRADE_ONLY" -ne 1 ]; then
+  if [ -z "$COUNT" ]; then
+    if [ -r /dev/tty ]; then
+      read -r -u 3 -p "How many Conduit instances do you want? " COUNT || true
+    fi
   fi
+  COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
+  [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number of Conduit instances"; exit 1; }
 fi
-COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
-[[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number of Conduit instances"; exit 1; }
 
 BASE_PORT=$(printf '%s' "$BASE_PORT" | tr -d '[:space:]')
 [[ "$BASE_PORT" =~ ^[0-9]+$ ]] && [ "$BASE_PORT" -ge 1 ] && [ "$BASE_PORT" -le 65535 ] || { err "Invalid base port"; exit 1; }
@@ -379,6 +383,15 @@ container_exists() {
   docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$name"
 }
 
+EXISTING_CONDUITS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^conduit[0-9]+$' || true)
+EXISTING_IDX=()
+if [ -n "$EXISTING_CONDUITS" ]; then
+  while IFS= read -r name; do
+    idx="${name#conduit}"
+    [[ "$idx" =~ ^[0-9]+$ ]] && EXISTING_IDX+=("$idx")
+  done <<< "$EXISTING_CONDUITS"
+fi
+
 info "Configuring firewall (ufw) for node-exporter..."
 if command -v ufw >/dev/null 2>&1; then
   ufw allow from "$HUB_IP" to any port 9100 proto tcp >/dev/null 2>&1 || true
@@ -410,21 +423,34 @@ services:
       - ./node-exporter/web.yml:/etc/node-exporter/web.yml:ro
 EOF
 
-MISSING_CONDUITS=()
-EXISTING_CONDUITS=()
-for i in $(seq 1 "$COUNT"); do
-  if container_exists "conduit$i"; then
-    EXISTING_CONDUITS+=("conduit$i")
-    continue
+TARGET_CONDUITS=()
+DISPLAY_COUNT=0
+if [ "$UPGRADE_ONLY" -eq 1 ]; then
+  if [ "${#EXISTING_IDX[@]}" -eq 0 ]; then
+    err "No existing conduit containers found to upgrade."
+    exit 1
   fi
-  MISSING_CONDUITS+=("$i")
-done
-
-if [ "${#EXISTING_CONDUITS[@]}" -gt 0 ]; then
-  warn "Existing conduits detected; preserving without recreate: ${EXISTING_CONDUITS[*]}"
+  TARGET_CONDUITS=("${EXISTING_IDX[@]}")
+  DISPLAY_COUNT="${#TARGET_CONDUITS[@]}"
+  info "Upgrade mode: updating existing conduits only: ${TARGET_CONDUITS[*]}"
+else
+  MISSING_CONDUITS=()
+  EXISTING_CONDUIT_NAMES=()
+  for i in $(seq 1 "$COUNT"); do
+    if container_exists "conduit$i"; then
+      EXISTING_CONDUIT_NAMES+=("conduit$i")
+      continue
+    fi
+    MISSING_CONDUITS+=("$i")
+  done
+  if [ "${#EXISTING_CONDUIT_NAMES[@]}" -gt 0 ]; then
+    warn "Existing conduits detected; preserving without recreate: ${EXISTING_CONDUIT_NAMES[*]}"
+  fi
+  TARGET_CONDUITS=("${MISSING_CONDUITS[@]}")
+  DISPLAY_COUNT="$COUNT"
 fi
 
-for i in "${MISSING_CONDUITS[@]}"; do
+for i in "${TARGET_CONDUITS[@]}"; do
   PORT=$((BASE_PORT + i - 1))
   cat >> docker-compose.yml <<EOF
 
@@ -446,19 +472,25 @@ for i in "${MISSING_CONDUITS[@]}"; do
 EOF
 done
 
-for i in "${MISSING_CONDUITS[@]}"; do
+for i in "${TARGET_CONDUITS[@]}"; do
   mkdir -p "conduit$i-data"
 done
 
 info "Starting client stack..."
-compose up -d
+if [ "$UPGRADE_ONLY" -eq 1 ]; then
+  info "Pulling latest images..."
+  compose pull
+  compose up -d --remove-orphans
+else
+  compose up -d
+fi
 
 HOSTNAME=$(hostname | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | cut -c1-30)
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 info "Client ready."
 info "Name: ${HOSTNAME:-unknown}"
 info "IP: ${IP:-unknown}"
-info "Conduits: $COUNT"
+info "Conduits: $DISPLAY_COUNT"
 info "Base metrics port: $BASE_PORT"
 info "node-exporter: 9100 (Basic Auth enabled)"
 CLIENT_EOF
@@ -642,6 +674,9 @@ add_remote_client() {
   info "Run this on the slave server:"
   printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-clients %s --bandwidth %s\n' \
     "$hub_ip" "$web_port" "$count" "$base_port" "$max_clients" "$bw_mbps"
+  info "Upgrade existing slave conduits only (no data reset):"
+  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --upgrade\n' \
+    "$hub_ip" "$web_port"
   hr
 }
 
