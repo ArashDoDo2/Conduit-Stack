@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.6"
+STACK_VERSION="2026.02.08.7"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -623,10 +623,46 @@ remove_remote_client() {
     exit 1
   fi
 
-  local alias
-  read -r -u 3 -p "Slave server name/alias to remove: " alias || true
-  alias=$(printf '%s' "$alias" | tr -d '[:space:]')
-  [ -n "$alias" ] || { err "Alias is required."; exit 1; }
+  local aliases_raw alias choice
+  aliases_raw=$(python3 - "$TARGETS_FILE" <<'PY'
+import json, sys
+path=sys.argv[1]
+with open(path, "r") as f:
+  raw=f.read().strip()
+data=json.loads(raw) if raw else []
+aliases=set()
+for g in data:
+  labels=g.get("labels", {})
+  if labels.get("role") == "node":
+    a=labels.get("alias", "").strip()
+    if a:
+      aliases.add(a)
+for a in sorted(aliases):
+  print(a)
+PY
+)
+  if [ -z "$aliases_raw" ]; then
+    err "No slave server aliases found in $TARGETS_FILE."
+    exit 1
+  fi
+
+  mapfile -t ALIASES <<< "$aliases_raw"
+  info "Available slave servers:"
+  local i=1
+  for alias in "${ALIASES[@]}"; do
+    printf '  %d) %s\n' "$i" "$alias"
+    i=$((i+1))
+  done
+
+  read -r -u 3 -p "Choose number to remove (or type alias): " choice || true
+  choice=$(printf '%s' "$choice" | tr -d '[:space:]')
+  if [[ "$choice" =~ ^[0-9]+$ ]]; then
+    [ "$choice" -ge 1 ] && [ "$choice" -le "${#ALIASES[@]}" ] || { err "Invalid selection."; exit 1; }
+    alias="${ALIASES[$((choice-1))]}"
+  else
+    alias="$choice"
+    [ -n "$alias" ] || { err "Alias is required."; exit 1; }
+  fi
 
   python3 - "$TARGETS_FILE" "$alias" <<'PY'
 import json, os, sys
