@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.1"
+STACK_VERSION="2026.02.08.2"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -250,13 +250,20 @@ ensure_docker() {
 
   warn "Docker not found. Installing..."
   if command -v apt-get >/dev/null 2>&1; then
+    docker_repo_os="ubuntu"
+    if [ -r /etc/os-release ]; then
+      . /etc/os-release
+      if [ "${ID:-}" = "debian" ]; then
+        docker_repo_os="debian"
+      fi
+    fi
     if command -v sudo >/dev/null 2>&1; then
       sudo apt-get update -y
       sudo apt-get install -y ca-certificates curl gnupg
       sudo install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      curl -fsSL "https://download.docker.com/linux/$docker_repo_os/gpg" | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
       sudo chmod a+r /etc/apt/keyrings/docker.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$docker_repo_os $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
         sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
       sudo apt-get update -y
       sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -264,9 +271,9 @@ ensure_docker() {
       apt-get update -y
       apt-get install -y ca-certificates curl gnupg
       install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      curl -fsSL "https://download.docker.com/linux/$docker_repo_os/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
       chmod a+r /etc/apt/keyrings/docker.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$docker_repo_os $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
         tee /etc/apt/sources.list.d/docker.list >/dev/null
       apt-get update -y
       apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -592,13 +599,20 @@ ensure_docker() {
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
+    docker_repo_os="ubuntu"
+    if [ -r /etc/os-release ]; then
+      . /etc/os-release
+      if [ "${ID:-}" = "debian" ]; then
+        docker_repo_os="debian"
+      fi
+    fi
     if command -v sudo >/dev/null 2>&1; then
       sudo apt-get update -y
       sudo apt-get install -y ca-certificates curl gnupg
       sudo install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      curl -fsSL "https://download.docker.com/linux/$docker_repo_os/gpg" | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
       sudo chmod a+r /etc/apt/keyrings/docker.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$docker_repo_os $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
         sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
       sudo apt-get update -y
       sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -606,9 +620,9 @@ ensure_docker() {
       apt-get update -y
       apt-get install -y ca-certificates curl gnupg
       install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      curl -fsSL "https://download.docker.com/linux/$docker_repo_os/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
       chmod a+r /etc/apt/keyrings/docker.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$docker_repo_os $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
         tee /etc/apt/sources.list.d/docker.list >/dev/null
       apt-get update -y
       apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
