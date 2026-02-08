@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.13"
+STACK_VERSION="2026.02.08.14"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -842,6 +842,15 @@ ensure_docker() {
   fi
 }
 
+upgrade_existing_stack_only() {
+  info "Upgrading existing stack (no backup prompts)..."
+  info "Pulling latest images..."
+  compose pull
+  info "Restarting containers..."
+  compose up -d --remove-orphans
+  ok "Upgrade completed successfully."
+}
+
 ensure_docker
 
 COMPOSE_BASE=()
@@ -902,19 +911,20 @@ if [ -n "$EXISTING" ]; then
     done <<< "$EXISTING"
   fi
 
-  hr
-  section "Existing containers detected"
-  while IFS= read -r name; do
-    [ -n "$name" ] && printf '  - %s\n' "$name"
-  done <<< "$EXISTING"
-  echo ""
-  info "Choose how to proceed:"
-  printf '  %b1%b) Keep existing setup %b(add new containers to current setup)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-  printf '  %b2%b) Upgrade in place %b(pull latest images, restart, keep data)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-  printf '  %b3%b) CLEAN install %b(remove containers + data, start fresh)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-  printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-  read -r -u 3 -p "Choose [1/2/3/4]: " MODE
-  if [ "$MODE" = "3" ]; then
+  while :; do
+    hr
+    section "Existing containers detected"
+    while IFS= read -r name; do
+      [ -n "$name" ] && printf '  - %s\n' "$name"
+    done <<< "$EXISTING"
+    echo ""
+    info "Choose how to proceed:"
+    printf '  %b1%b) Keep existing setup %b(add new containers to current setup)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '  %b2%b) Upgrade in place %b(pull latest images, restart, keep data)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '  %b3%b) CLEAN install %b(remove containers + data, start fresh)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '  %b4%b) Modify existing setup %b(add or remove specific conduits)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    read -r -u 3 -p "Choose [1/2/3/4]: " MODE
+    if [ "$MODE" = "3" ]; then
 if [ -d grafana-data ]; then
   read -r -u 3 -p "Backup Grafana data before CLEAN install? (y/n) [y]: " BK_GRAFANA || true
   BK_GRAFANA=${BK_GRAFANA:-y}
@@ -943,25 +953,19 @@ fi
     if [ "$DELETE_GRAFANA_DATA" -eq 1 ]; then
       rm -rf grafana-data
     fi
-  elif [ "$MODE" = "2" ]; then
-    UPGRADE=1
-    if [ -d grafana-data ]; then
-      read -r -u 3 -p "Backup Grafana data before upgrade? (y/n) [y]: " BK_GRAFANA || true
-      BK_GRAFANA=${BK_GRAFANA:-y}
-      if [[ "$BK_GRAFANA" =~ ^[Yy]$ ]]; then
-        backup_dir "grafana-data" "grafana-data"
-      fi
+      break
+    elif [ "$MODE" = "2" ]; then
+      upgrade_existing_stack_only
+      continue
+    elif [ "$MODE" = "4" ]; then
+      MODIFY=1
+      break
+    elif [ "$MODE" = "1" ] || [ -z "$MODE" ]; then
+      break
+    else
+      err "Invalid selection"
     fi
-    if [ -d prometheus-data ]; then
-      read -r -u 3 -p "Backup Prometheus data before upgrade? (y/n) [y]: " BK_PROM || true
-      BK_PROM=${BK_PROM:-y}
-      if [[ "$BK_PROM" =~ ^[Yy]$ ]]; then
-        backup_dir "prometheus-data" "prometheus-data"
-      fi
-    fi
-  elif [ "$MODE" = "4" ]; then
-    MODIFY=1
-  fi
+  done
 fi
 
 ########################################
