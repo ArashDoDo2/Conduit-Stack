@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.5"
+STACK_VERSION="2026.02.08.6"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1295,26 +1295,26 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
 
     {
       "type": "timeseries",
-      "title": "Connected Clients per Conduit",
+      "title": "Connected Clients per Server",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "conduit_connected_clients",
-        "legendFormat": "{{alias}}/{{conduit}}"
+        "expr": "sum by(alias) (conduit_connected_clients)",
+        "legendFormat": "{{alias}}"
       }]
     },
     {
       "type": "timeseries",
-      "title": "Connecting Clients per Conduit",
+      "title": "Connecting Clients per Server",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "conduit_connecting_clients",
-        "legendFormat": "{{alias}}/{{conduit}}"
+        "expr": "sum by(alias) (conduit_connecting_clients)",
+        "legendFormat": "{{alias}}"
       }]
     },
 
     {
       "type": "timeseries",
-      "title": "Uploaded Bytes per Conduit (cumulative)",
+      "title": "Uploaded Bytes per Server (cumulative)",
       "gridPos": { "x": 0, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
         "defaults": {
@@ -1322,13 +1322,13 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "targets": [{
-        "expr": "conduit_bytes_uploaded",
-        "legendFormat": "{{alias}}/{{conduit}}"
+        "expr": "sum by(alias) (conduit_bytes_uploaded)",
+        "legendFormat": "{{alias}}"
       }]
     },
     {
       "type": "timeseries",
-      "title": "Downloaded Bytes per Conduit (cumulative)",
+      "title": "Downloaded Bytes per Server (cumulative)",
       "gridPos": { "x": 12, "y": 11, "w": 12, "h": 7 },
       "fieldConfig": {
         "defaults": {
@@ -1336,8 +1336,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         }
       },
       "targets": [{
-        "expr": "conduit_bytes_downloaded",
-        "legendFormat": "{{alias}}/{{conduit}}"
+        "expr": "sum by(alias) (conduit_bytes_downloaded)",
+        "legendFormat": "{{alias}}"
       }]
     },
 
