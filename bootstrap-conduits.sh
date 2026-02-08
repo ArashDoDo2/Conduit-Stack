@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.8"
+STACK_VERSION="2026.02.08.9"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1396,8 +1396,20 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
 
     {
       "type": "stat",
-      "title": "Total Uploaded (bytes)",
-      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 4 },
+      "title": "Server Count",
+      "gridPos": { "x": 0, "y": 18, "w": 6, "h": 4 },
+      "targets": [{ "expr": "count(count by(alias) (conduit_is_live))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Total Conduits",
+      "gridPos": { "x": 6, "y": 18, "w": 6, "h": 4 },
+      "targets": [{ "expr": "count(conduit_is_live)" }]
+    },
+    {
+      "type": "stat",
+      "title": "Total Uploaded (All Servers)",
+      "gridPos": { "x": 12, "y": 18, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
@@ -1405,8 +1417,8 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     },
     {
       "type": "stat",
-      "title": "Total Downloaded (bytes)",
-      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 4 },
+      "title": "Total Downloaded (All Servers)",
+      "gridPos": { "x": 18, "y": 18, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
