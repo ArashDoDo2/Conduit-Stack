@@ -13,6 +13,9 @@ All notable changes to this project are documented in this file.
 - Replaced deprecated Python `crypt` fallback with `python3-bcrypt`.
 - Added cross-distro best-effort auto-install of bcrypt Python package in both Hub and generated Slave installer flows.
 
+## [2026.02.08.28]
+- Replaced global `Is Live` stat with a per-server `Server Status` table.
+
 ## [2026.02.08.23]
 - Added node-exporter based system metrics panels:
   - `CPU Usage % per Server`

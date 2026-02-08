@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.27"
+STACK_VERSION="2026.02.08.28"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1617,22 +1617,32 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
       "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
     },
     {
-      "type": "stat",
-      "title": "Is Live",
+      "type": "table",
+      "title": "Server Status",
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": {
           "mappings": [
             { "type": "value", "options": { "0": { "text": "Down", "color": "red" }, "1": { "text": "Live", "color": "green" } } }
-          ]
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          }
         }
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
+        "showHeader": true
       },
-      "targets": [{ "expr": "min(conduit_is_live)" }]
+      "targets": [{
+        "expr": "max by(alias) (conduit_is_live)",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }]
     },
 
     {
