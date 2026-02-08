@@ -3,62 +3,44 @@
 [![License](https://img.shields.io/github/license/ArashDoDo2/Conduit-Stack)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/ArashDoDo2/Conduit-Stack?display_name=tag)](https://github.com/ArashDoDo2/Conduit-Stack/releases)
 
-A production-grade, opinionated stack for running **Psiphon Conduit** with
-**Prometheus** and **Grafana**, deployed via a single interactive installer.
+Interactive installer for running a central Conduit monitoring hub and multiple
+remote slave servers with Prometheus + Grafana.
 
-Run one script, answer a few questions, and get a fully working Conduit
-deployment with correct metrics and dashboards with no manual configuration.
+The project is Linux-first and built around one script:
 
-## Features
+- `bootstrap-conduits.sh`
 
-- One-command installer (interactive, minimal questions)
-- Multiple Conduit instances (scalable)
-- Prometheus + Grafana pre-configured
-- Accurate dashboards (no misleading metrics)
-- Short, readable instance names in Grafana (`conduit1`, `conduit2`, ...)
-- Configurable instance count, max clients, and bandwidth per client (Mbps)
-- Clean, keep, or upgrade existing installation modes
-- Linux-first, Windows supported via WSL2
-- No node_exporter, no rate guessing, no fake traffic graphs
+## What It Does
 
-## What This Stack Includes
+- Deploys a hub stack: `conduit*`, `prometheus`, optional `grafana`, `client-web`
+- Generates and serves a remote installer: `http://<hub-ip>:<web-port>/install-client.sh`
+- Adds/removes slave servers from Prometheus target discovery (`targets.json`)
+- Supports slave upgrade mode without wiping conduit data
+- Provisions Grafana dashboards automatically
 
-- Psiphon Conduit
-- Prometheus (metrics collection)
-- Grafana (pre-provisioned dashboards)
+## Current Menu Flows
 
-Everything runs via Docker Compose.
+When you run `bootstrap-conduits.sh`, main menu options are:
 
-## Supported Platforms
+1. `Setup Hub`
+2. `Add Slave Server`
+3. `Remove Slave Server`
 
-### Linux (native)
+If existing hub containers are detected, you also get:
 
-- Ubuntu, Debian, etc.
-- Docker + Docker Compose v2
-
-### Windows (recommended way)
-
-- WSL2 (Ubuntu)
-- Docker Desktop with WSL2 backend
-
-Native Windows / PowerShell execution is not supported. This stack is
-intentionally Linux-first.
-
-## Requirements
-
-- Docker (installer can auto-install on common Linux distros)
-- Docker Compose v2 (`docker compose`)
-- Internet access (to pull images)
+1. `Keep existing setup`
+2. `Upgrade in place` (simple: pull + restart, no backup prompts)
+3. `CLEAN install`
+4. `Modify existing setup`
 
 ## Quick Start
 
-Option A (recommended): download and run the installer:
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh && bash bootstrap-conduits.sh
+curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh
+bash bootstrap-conduits.sh
 ```
 
-Option B: clone the repo and run locally:
+Or clone and run locally:
 
 ```bash
 git clone https://github.com/ArashDoDo2/Conduit-Stack.git
@@ -67,150 +49,127 @@ chmod +x bootstrap-conduits.sh
 ./bootstrap-conduits.sh
 ```
 
-The installer will ask:
+## Hub and Slave Model
 
-- Whether to keep or clean an existing setup (if found)
-- Optional upgrade in place (update images + restart, keep data)
-- If you keep: how many new Conduit instances to add (it shows current count)
-- If you keep and add 0: whether to upgrade images and restart containers
-- If you clean: how many Conduit instances to run total
-- Max clients per Conduit (default: 50)
-- Bandwidth per client in Mbps (default: 8)
-- Enable or disable Grafana
-- Confirmation to proceed
+- Hub stores target definitions in `targets.json`
+- Prometheus scrapes from `targets.json` via file SD
+- `Add Slave Server` appends slave targets (conduit metrics + node exporter)
+- `Remove Slave Server` removes all targets by alias
 
-## Grafana Access
+### Back Navigation
 
-After installation (if Grafana is enabled):
+In slave submenus, entering `b` or `back` returns to the main menu.
 
-- URL: `http://<server-ip>:3000`
-- Username: `admin`
-- Password: `admin`
-- Dashboard: Dashboards -> Conduit -> Conduit - Clients & Traffic Volume
+## Slave Installer
 
-Change the admin password on first login.
+The generated slave installer supports:
 
-Prometheus is not exposed on a host port by default. Grafana is the primary UI
-for metrics.
+- Fresh/add mode:
+  - `--count`
+  - `--base-port`
+  - `--max-clients`
+  - `--bandwidth`
+- Upgrade-only mode:
+  - `--upgrade`
 
-## Dashboard Philosophy
+Upgrade-only mode updates existing slave containers without data reset:
 
-This project intentionally avoids misleading graphs.
-
-### What is shown
-
-- Total connected clients
-- Capacity and available slots
-- Clients per Conduit instance (time series)
-- Cumulative traffic volume per Conduit
-- Uploaded bytes
-- Downloaded bytes
-- Total uploaded and downloaded (stat only)
-
-### What is not shown (on purpose)
-
-- Throughput or Mbps graphs (Conduit does not expose true counters)
-- node_exporter NIC traffic
-- Uptime or idle-time noise
-
-The goal is operational correctness, not pretty but wrong charts.
-
-## Metric Notes
-
-- `--bandwidth` is passed directly in Mbps, exactly as Conduit expects
-- Traffic metrics are per-container cumulative gauges
-- No rate calculations are performed
-
-## Clean vs Keep Mode
-
-If an existing installation is detected, the installer asks:
-
-- Keep: reuse existing data and containers, update dashboards/configs
-- Upgrade: pull latest images and restart containers (data preserved)
-- Clean: remove containers and data directories, start fresh
-
-## Repository Structure
-
+```bash
+curl -fsSL http://<hub-ip>:<web-port>/install-client.sh | bash -s -- --upgrade
 ```
+
+## Data Safety Behavior
+
+- Existing slave `conduitN` containers are preserved by default in normal install flow
+- Missing conduits are created, existing ones are not recreated
+- `--upgrade` mode upgrades existing conduits and keeps their data volumes
+
+## Dashboard (Current)
+
+Dashboard is provisioned at:
+
+- Folder: `Conduit`
+- Title: `Conduit — Clients & Traffic Volume`
+
+Key panels:
+
+- Connected clients (total)
+- Max capacity
+- Available slots
+- Is live
+- Connected clients per server (`sum by(alias)`)
+- Connecting clients per server (`sum by(alias)`)
+- Uploaded bytes per server (cumulative)
+- Downloaded bytes per server (cumulative)
+- Server count
+- Total conduits
+- Total uploaded/downloaded (all servers)
+
+Legends are alias-based for readability at scale.
+
+## Version Tracking
+
+Script version is embedded in `bootstrap-conduits.sh` as `STACK_VERSION`.
+
+At runtime the installer writes:
+
+- `stack-version`
+- `web/version.txt`
+
+This helps verify which generated installer version is live on the hub.
+
+## Requirements
+
+- Linux host (Debian/Ubuntu and similar supported)
+- Docker Engine
+- Docker Compose (`docker compose` plugin or `docker-compose`)
+- Internet access for pulling images
+
+Notes:
+
+- Installer handles Docker repo URL differences for Ubuntu vs Debian.
+- If OpenSSL bcrypt is unavailable, bcrypt generation falls back to Python.
+
+## Generated/Managed Files
+
+Typical workspace after running hub setup:
+
+```text
 Conduit-Stack/
-├── bootstrap-conduits.sh      # Main installer
-├── docker-compose.yml         # Generated
-├── prometheus.yml             # Generated
-├── grafana-provisioning/
-│   ├── datasources/
-│   └── dashboards/
-├── grafana-data/
-├── conduit1-data/
-├── conduit2-data/
+├── bootstrap-conduits.sh
+├── docker-compose.yml
+├── prometheus.yml
+├── targets.json
+├── web/
+│   ├── install-client.sh
+│   └── version.txt
+├── web-port
+├── stack-version
+├── node-exporter-password
+├── hub-ip
 ├── prometheus-data/
-└── ...
+├── grafana-data/
+└── conduit*-data/
 ```
 
-Most files are generated automatically by the installer.
+## Access
 
-## Windows Users (WSL2)
-
-Recommended setup:
-
-```bash
-wsl --install
-```
-
-Then install Docker Desktop and enable the WSL2 backend.
-Run everything inside the WSL Ubuntu shell:
-
-```bash
-./bootstrap-conduits.sh
-```
-
-If Docker is missing inside WSL, the installer will prompt you to use
-Docker Desktop with WSL integration rather than attempting to install
-Docker inside WSL.
-
-## Production Notes
-
-- Containers run as root inside Docker to avoid permission issues
-- Designed for VPS or server environments
-- Suitable for long-running Conduit nodes
+- Grafana: `http://<hub-ip>:<grafana-port>`
+- Slave installer: `http://<hub-ip>:<web-port>/install-client.sh`
 
 ## Troubleshooting
 
-- Grafana not reachable: check `http://<server-ip>:3000` and ensure port 3000 is open.
-- Prometheus not scraping: confirm `prometheus.yml` was generated and containers are healthy.
-- Installer fails to pull images: verify internet access and Docker daemon status.
-- Docker Compose not found: ensure `docker compose` (v2) or `docker-compose` is installed.
-- Permission errors: re-run the installer after ensuring Docker is running and your user can access it.
-- WSL + Docker missing: install Docker Desktop on Windows and enable WSL integration.
-
-## Uninstall
-
-If you want a clean removal:
-
-```bash
-docker rm -f $(docker ps -aq --filter name=conduit --filter name=prometheus --filter name=grafana) 2>/dev/null || true
-rm -rf conduit*-data prometheus-data grafana-data grafana-provisioning prometheus.yml docker-compose.yml
-```
-
-## Roadmap (Optional)
-
-- Alerting (capacity thresholds)
-- Multi-server or federation setup
-- Auto-scaling logic
-- Backup and restore helpers
-
-These are intentionally not included in the baseline.
+- Slave not visible in Grafana:
+  - Confirm alias exists in `targets.json`
+  - Confirm slave ports are reachable from hub
+  - Wait for Prometheus file SD refresh
+- Debian install error to Ubuntu Docker repo:
+  - Use latest script version; Debian repo handling is built in
+- `b` in submenu exits script:
+  - Use latest script version; return handling is fixed under `set -e`
+- Old generated slave installer still used:
+  - Re-run hub script once to regenerate `web/install-client.sh`
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## Contributing
-
-This repository is intentionally opinionated. Contributions should focus on
-correctness, not feature creep.
-
-## Final Note
-
-This stack exists to solve a very specific problem:
-deploy Psiphon Conduit correctly, observably, and without lies in the metrics.
-If that is what you need, this is for you.
