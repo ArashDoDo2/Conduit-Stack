@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.11"
+STACK_VERSION="2026.02.08.12"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -374,6 +374,11 @@ compose() {
   "${COMPOSE_BASE[@]}" "$@"
 }
 
+container_exists() {
+  local name="$1"
+  docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$name"
+}
+
 info "Configuring firewall (ufw) for node-exporter..."
 if command -v ufw >/dev/null 2>&1; then
   ufw allow from "$HUB_IP" to any port 9100 proto tcp >/dev/null 2>&1 || true
@@ -405,7 +410,21 @@ services:
       - ./node-exporter/web.yml:/etc/node-exporter/web.yml:ro
 EOF
 
+MISSING_CONDUITS=()
+EXISTING_CONDUITS=()
 for i in $(seq 1 "$COUNT"); do
+  if container_exists "conduit$i"; then
+    EXISTING_CONDUITS+=("conduit$i")
+    continue
+  fi
+  MISSING_CONDUITS+=("$i")
+done
+
+if [ "${#EXISTING_CONDUITS[@]}" -gt 0 ]; then
+  warn "Existing conduits detected; preserving without recreate: ${EXISTING_CONDUITS[*]}"
+fi
+
+for i in "${MISSING_CONDUITS[@]}"; do
   PORT=$((BASE_PORT + i - 1))
   cat >> docker-compose.yml <<EOF
 
@@ -427,7 +446,7 @@ for i in $(seq 1 "$COUNT"); do
 EOF
 done
 
-for i in $(seq 1 "$COUNT"); do
+for i in "${MISSING_CONDUITS[@]}"; do
   mkdir -p "conduit$i-data"
 done
 
