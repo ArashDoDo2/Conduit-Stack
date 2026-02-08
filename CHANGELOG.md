@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.19]
+- Menu flow polish across installer:
+  - Added `q/quit` support in main menu and existing-setup menu.
+  - Added `q/quit` support in Add/Remove Slave Server prompts.
+  - Improved menu prompt hints and input normalization.
+
 ## [2026.02.08.18]
 - Added `b/back` option to the existing-setup (upgrade/keep/clean/modify) menu.
 - Selecting `b` now returns to the main installer menu.
