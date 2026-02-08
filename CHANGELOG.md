@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.20]
+- Fixed back-to-main restart in existing-setup menu when script is launched as `bash bootstrap-conduits.sh`.
+- Replaced `exec "$0"` with an absolute script path restart.
+
 ## [2026.02.08.19]
 - Menu flow polish across installer:
   - Added `q/quit` support in main menu and existing-setup menu.

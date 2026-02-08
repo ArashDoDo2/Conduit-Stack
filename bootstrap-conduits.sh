@@ -51,12 +51,19 @@ is_quit_choice() {
     *) return 1 ;;
   esac
 }
+script_path() {
+  local src="$0"
+  [ -n "$src" ] || return 1
+  local dir
+  dir=$(cd "$(dirname "$src")" && pwd)
+  printf '%s/%s' "$dir" "$(basename "$src")"
+}
 
 ########################################
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.19"
+STACK_VERSION="2026.02.08.20"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -1002,7 +1009,7 @@ if [ -n "$EXISTING" ]; then
     is_quit_choice "$MODE" && exit 0
     if is_back_choice "$MODE"; then
       info "Returning to main menu..."
-      exec "$0"
+      exec bash "$(script_path)"
     fi
     if [ "$MODE" = "3" ]; then
 if [ -d grafana-data ]; then
