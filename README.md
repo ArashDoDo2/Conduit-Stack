@@ -3,44 +3,68 @@
 [![License](https://img.shields.io/github/license/ArashDoDo2/Conduit-Stack)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/ArashDoDo2/Conduit-Stack?display_name=tag)](https://github.com/ArashDoDo2/Conduit-Stack/releases)
 
-Interactive installer for running a central Conduit monitoring hub and multiple
-remote slave servers with Prometheus + Grafana.
+Interactive Linux-first installer for running a central Conduit monitoring hub
+and multiple remote slave servers with Prometheus + Grafana.
 
-The project is Linux-first and built around one script:
+Main script:
 
 - `bootstrap-conduits.sh`
 
-## What It Does
+## Goals
 
-- Deploys a hub stack: `conduit*`, `prometheus`, optional `grafana`, `client-web`
-- Generates and serves a remote installer: `http://<hub-ip>:<web-port>/install-client.sh`
-- Adds/removes slave servers from Prometheus target discovery (`targets.json`)
-- Supports slave upgrade mode without wiping conduit data
-- Provisions Grafana dashboards automatically
+- Fast hub bootstrap with sane defaults
+- Manage slave server registration/removal safely
+- Keep Conduit data persistent during normal operations and upgrades
+- Provide useful, scale-friendly dashboards (including CPU/RAM per server)
 
-## Current Menu Flows
+## What The Installer Manages
 
-When you run `bootstrap-conduits.sh`, main menu options are:
+- Hub services:
+  - `conduit*`
+  - `prometheus`
+  - `grafana` (optional)
+  - `client-web` (serves slave installer)
+- Discovery and metadata:
+  - `targets.json`
+  - `hub-ip`
+  - `web-port`
+  - `stack-version`
+  - `web/version.txt`
+
+## Main Menu
 
 1. `Setup Hub`
 2. `Add Slave Server`
 3. `Remove Slave Server`
 
-If existing hub containers are detected, you also get:
+Navigation:
+
+- `b` or `back`: go to previous/main menu where available
+- `q` or `quit`: exit
+
+## Existing Setup Menu (Hub Already Running)
 
 1. `Keep existing setup`
-2. `Upgrade in place` (simple: pull + restart, no backup prompts)
+2. `Upgrade in place`
 3. `CLEAN install`
 4. `Modify existing setup`
 
+Important behavior:
+
+- `Upgrade in place` only pulls/restarts containers.
+- `Upgrade in place` does **not** regenerate dashboard/config files.
+- To apply dashboard/config changes from new script code, use `Keep existing setup` and proceed with install.
+
 ## Quick Start
+
+Run from GitHub:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ArashDoDo2/Conduit-Stack/main/bootstrap-conduits.sh -o bootstrap-conduits.sh
 bash bootstrap-conduits.sh
 ```
 
-Or clone and run locally:
+Or clone:
 
 ```bash
 git clone https://github.com/ArashDoDo2/Conduit-Stack.git
@@ -49,20 +73,15 @@ chmod +x bootstrap-conduits.sh
 ./bootstrap-conduits.sh
 ```
 
-## Hub and Slave Model
+## Slave Server Flow
 
-- Hub stores target definitions in `targets.json`
-- Prometheus scrapes from `targets.json` via file SD
-- `Add Slave Server` appends slave targets (conduit metrics + node exporter)
-- `Remove Slave Server` removes all targets by alias
+`Add Slave Server` updates `targets.json` and prints ready-to-run commands.
 
-### Back Navigation
+Generated installer URL:
 
-In slave submenus, entering `b` or `back` returns to the main menu.
+- `http://<hub-ip>:<web-port>/install-client.sh`
 
-## Slave Installer
-
-The generated slave installer supports:
+Installer modes:
 
 - Fresh/add mode:
   - `--count`
@@ -72,103 +91,108 @@ The generated slave installer supports:
 - Upgrade-only mode:
   - `--upgrade`
 
-Upgrade-only mode updates existing slave containers without data reset:
+Upgrade-only example:
 
 ```bash
 curl -fsSL http://<hub-ip>:<web-port>/install-client.sh | bash -s -- --upgrade
 ```
 
-## Data Safety Behavior
+Data safety on slave:
 
-- Existing slave `conduitN` containers are preserved by default in normal install flow
-- Missing conduits are created, existing ones are not recreated
-- `--upgrade` mode upgrades existing conduits and keeps their data volumes
+- Existing `conduitN` containers are preserved in normal add flow.
+- Only missing conduits are created.
+- `--upgrade` updates existing conduits without wiping data volumes.
 
-## Dashboard (Current)
+## Dashboard Coverage
 
-Dashboard is provisioned at:
+Provisioned dashboard:
 
 - Folder: `Conduit`
 - Title: `Conduit — Clients & Traffic Volume`
 
-Key panels:
+Panels include:
 
-- Connected clients (total)
-- Max capacity
-- Available slots
-- Is live
-- Connected clients per server (`sum by(alias)`)
-- Connecting clients per server (`sum by(alias)`)
-- Uploaded bytes per server (cumulative)
-- Downloaded bytes per server (cumulative)
-- Server count
-- Total conduits
-- Total uploaded/downloaded (all servers)
-
-Legends are alias-based for readability at scale.
-
-## Version Tracking
-
-Script version is embedded in `bootstrap-conduits.sh` as `STACK_VERSION`.
-
-At runtime the installer writes:
-
-- `stack-version`
-- `web/version.txt`
-
-This helps verify which generated installer version is live on the hub.
-
-## Requirements
-
-- Linux host (Debian/Ubuntu and similar supported)
-- Docker Engine
-- Docker Compose (`docker compose` plugin or `docker-compose`)
-- Internet access for pulling images
+- Connected clients, capacity, slots, liveness
+- Per-server connected/connecting clients
+- Per-server uploaded/downloaded bytes (cumulative)
+- Per-server CPU usage %
+- Per-server memory usage %
+- Server count, total conduits, total traffic
 
 Notes:
 
-- Installer handles Docker repo URL differences for Ubuntu vs Debian.
-- If OpenSSL bcrypt is unavailable, bcrypt generation falls back to Python.
-
-## Generated/Managed Files
-
-Typical workspace after running hub setup:
-
-```text
-Conduit-Stack/
-├── bootstrap-conduits.sh
-├── docker-compose.yml
-├── prometheus.yml
-├── targets.json
-├── web/
-│   ├── install-client.sh
-│   └── version.txt
-├── web-port
-├── stack-version
-├── node-exporter-password
-├── hub-ip
-├── prometheus-data/
-├── grafana-data/
-└── conduit*-data/
-```
+- Per-server charts are alias-based (`sum by(alias)` where relevant).
+- CPU/RAM panels depend on `node-exporter` metrics.
 
 ## Access
 
 - Grafana: `http://<hub-ip>:<grafana-port>`
 - Slave installer: `http://<hub-ip>:<web-port>/install-client.sh`
 
+## Applying New Dashboard Changes (Recommended Checklist)
+
+After pulling newer script code on hub:
+
+1. `bash bootstrap-conduits.sh`
+2. Choose `Setup Hub`
+3. In existing setup menu choose `Keep existing setup`
+4. Continue and confirm install
+5. Restart/refresh Grafana UI (`Ctrl+F5`)
+
+## Requirements
+
+- Linux host (Debian/Ubuntu and similar)
+- Docker Engine
+- Docker Compose (`docker compose` or `docker-compose`)
+- Internet access for image pulls
+
+Implementation notes:
+
+- Docker apt repo handling supports Debian vs Ubuntu automatically.
+- If OpenSSL bcrypt is unavailable, installer falls back to Python capability.
+- Hub IP is auto-detected before prompting (with manual fallback).
+
+## Repository Files (Common Runtime State)
+
+```text
+Conduit-Stack/
+├── bootstrap-conduits.sh
+├── CHANGELOG.md
+├── README.md
+├── docker-compose.yml              # generated
+├── prometheus.yml                 # generated
+├── targets.json                   # generated
+├── web/
+│   ├── install-client.sh          # generated
+│   └── version.txt                # generated
+├── web-port                       # generated
+├── stack-version                  # generated
+├── hub-ip                         # generated
+├── node-exporter-password         # generated
+├── grafana-provisioning/          # generated
+├── prometheus-data/
+├── grafana-data/
+└── conduit*-data/
+```
+
 ## Troubleshooting
 
 - Slave not visible in Grafana:
   - Confirm alias exists in `targets.json`
-  - Confirm slave ports are reachable from hub
+  - Confirm slave metrics ports are reachable from hub
   - Wait for Prometheus file SD refresh
-- Debian install error to Ubuntu Docker repo:
-  - Use latest script version; Debian repo handling is built in
-- `b` in submenu exits script:
-  - Use latest script version; return handling is fixed under `set -e`
-- Old generated slave installer still used:
-  - Re-run hub script once to regenerate `web/install-client.sh`
+- Dashboard changes not visible:
+  - Ensure you used `Keep existing setup` (not only `Upgrade in place`)
+  - Hard refresh Grafana browser cache (`Ctrl+F5`)
+- Old slave installer still being served:
+  - Re-run hub setup once to regenerate `web/install-client.sh`
+- Running script as `bash bootstrap-conduits.sh` and menu back issues:
+  - Use latest script version (fixed in recent versions)
+
+## Versioning and Change History
+
+- Script runtime version is `STACK_VERSION` inside `bootstrap-conduits.sh`.
+- Detailed change history lives in `CHANGELOG.md`.
 
 ## License
 
