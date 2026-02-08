@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.15"
+STACK_VERSION="2026.02.08.16"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -156,15 +156,37 @@ ensure_node_exporter_password() {
 
 ensure_hub_ip() {
   local hub_ip=""
+  local detected_ip=""
+
   if [ -r "$HUB_IP_FILE" ]; then
-    hub_ip=$(cat "$HUB_IP_FILE" | tr -d '[:space:]')
+    hub_ip=$(tr -d '[:space:]' < "$HUB_IP_FILE")
   fi
+
+  if [ -z "$hub_ip" ] && [ -n "${HUB_IP:-}" ]; then
+    hub_ip=$(printf '%s' "$HUB_IP" | tr -d '[:space:]')
+  fi
+
+  if [ -z "$hub_ip" ] && command -v ip >/dev/null 2>&1; then
+    detected_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
+    if [ -n "$detected_ip" ]; then
+      hub_ip="$detected_ip"
+    fi
+  fi
+
   if [ -z "$hub_ip" ]; then
+    detected_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if [ -n "$detected_ip" ]; then
+      hub_ip="$detected_ip"
+    fi
+  fi
+
+  if [ -z "$hub_ip" ]; then
+    warn "Could not auto-detect hub IP/DNS."
     read -r -u 3 -p "Hub public IP or DNS (for clients to reach you): " hub_ip || true
     hub_ip=$(printf '%s' "$hub_ip" | tr -d '[:space:]')
     [ -n "$hub_ip" ] || { err "Hub IP/DNS is required."; exit 1; }
-    printf '%s' "$hub_ip" > "$HUB_IP_FILE"
   fi
+  printf '%s' "$hub_ip" > "$HUB_IP_FILE"
   printf '%s' "$hub_ip"
 }
 

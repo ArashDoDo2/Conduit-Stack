@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.16]
+- Added hub IP auto-detection in `ensure_hub_ip`.
+- Detection order:
+  - Saved `hub-ip` file.
+  - `HUB_IP` environment variable.
+  - Default route source IP via `ip route get`.
+  - Fallback `hostname -I`.
+- Prompt is now only used as fallback when auto-detection fails.
+
 ## [2026.02.08.15]
 - Added slave installer `--upgrade` mode.
 - Upgrade mode updates existing slave conduits without data reset.
