@@ -44,7 +44,7 @@ section() { printf '%b\n' "${C_BOLD}${C_CYAN}$*${C_RESET}"; }
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.4"
+STACK_VERSION="2026.02.08.5"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -573,30 +573,30 @@ add_remote_client() {
   hub_ip=$(ensure_hub_ip)
   web_port=$(cat "$WEB_PORT_FILE" 2>/dev/null || printf '%s' "$WEB_PORT")
 
-  read -r -u 3 -p "Client name/alias: " client_alias || true
+  read -r -u 3 -p "Slave server name/alias: " client_alias || true
   client_alias=$(printf '%s' "$client_alias" | tr -d '[:space:]')
-  [ -n "$client_alias" ] || { err "Client name is required."; exit 1; }
+  [ -n "$client_alias" ] || { err "Slave server name is required."; exit 1; }
 
-  read -r -u 3 -p "Client IP/DNS: " client_ip || true
+  read -r -u 3 -p "Slave server IP/DNS: " client_ip || true
   client_ip=$(printf '%s' "$client_ip" | tr -d '[:space:]')
-  [ -n "$client_ip" ] || { err "Client IP/DNS is required."; exit 1; }
+  [ -n "$client_ip" ] || { err "Slave server IP/DNS is required."; exit 1; }
 
-  read -r -u 3 -p "How many Conduit instances on client? [1]: " count || true
+  read -r -u 3 -p "How many Conduit instances on slave server? [1]: " count || true
   count=${count:-1}
   count=$(printf '%s' "$count" | tr -d '[:space:]')
   [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -gt 0 ] || { err "Invalid number"; exit 1; }
 
-  read -r -u 3 -p "Client base metrics port? [$BASE_PORT]: " base_port || true
+  read -r -u 3 -p "Slave server base metrics port? [$BASE_PORT]: " base_port || true
   base_port=${base_port:-$BASE_PORT}
   base_port=$(printf '%s' "$base_port" | tr -d '[:space:]')
   [[ "$base_port" =~ ^[0-9]+$ ]] && [ "$base_port" -ge 1 ] && [ "$base_port" -le 65535 ] || { err "Invalid base port"; exit 1; }
 
-  read -r -u 3 -p "Max clients per Conduit on client? [50]: " max_clients || true
+  read -r -u 3 -p "Max clients per Conduit on slave server? [50]: " max_clients || true
   max_clients=${max_clients:-50}
   max_clients=$(printf '%s' "$max_clients" | tr -d '[:space:]')
   [[ "$max_clients" =~ ^[0-9]+$ ]] && [ "$max_clients" -gt 0 ] || { err "Invalid max clients"; exit 1; }
 
-  read -r -u 3 -p "Bandwidth per client (Mbps) on client? [8]: " bw_mbps || true
+  read -r -u 3 -p "Bandwidth per client (Mbps) on slave server? [8]: " bw_mbps || true
   bw_mbps=${bw_mbps:-8}
   bw_mbps=$(printf '%s' "$bw_mbps" | tr -d '[:space:]')
   [[ "$bw_mbps" =~ ^[0-9]+$ ]] && [ "$bw_mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
@@ -606,11 +606,46 @@ add_remote_client() {
   generate_client_script "$hub_ip" "$node_pw"
 
   hr
-  ok "Client targets appended to $TARGETS_FILE (Prometheus will pick them up automatically)."
-  info "Run this on the client:"
+  ok "Slave server targets appended to $TARGETS_FILE (Prometheus will pick them up automatically)."
+  info "Run this on the slave server:"
   printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-clients %s --bandwidth %s\n' \
     "$hub_ip" "$web_port" "$count" "$base_port" "$max_clients" "$bw_mbps"
   hr
+}
+
+remove_remote_client() {
+  if [ ! -f "$TARGETS_FILE" ]; then
+    err "$TARGETS_FILE not found. Run 'Setup Hub' first."
+    exit 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    err "python3 is required to update $TARGETS_FILE"
+    exit 1
+  fi
+
+  local alias
+  read -r -u 3 -p "Slave server name/alias to remove: " alias || true
+  alias=$(printf '%s' "$alias" | tr -d '[:space:]')
+  [ -n "$alias" ] || { err "Alias is required."; exit 1; }
+
+  python3 - "$TARGETS_FILE" "$alias" <<'PY'
+import json, os, sys
+path=sys.argv[1]
+alias=sys.argv[2]
+with open(path, "r") as f:
+  raw=f.read().strip()
+  data=json.loads(raw) if raw else []
+before=len(data)
+data=[g for g in data if g.get("labels",{}).get("alias")!=alias]
+after=len(data)
+if before==after:
+  raise SystemExit(f"Alias not found: {alias}")
+with open(path, "w") as f:
+  json.dump(data, f, indent=2)
+print(f"Removed alias '{alias}' from targets.")
+PY
+  ok "Removed slave server '$alias' from $TARGETS_FILE."
+  info "Prometheus will stop scraping it automatically."
 }
 
 hr
@@ -619,16 +654,23 @@ hr
 info "Version: $STACK_VERSION"
 info "Choose an action:"
 printf '  %b1%b) Setup Hub %b(Prometheus + Grafana + Web installer)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-printf '  %b2%b) Add Remote Client %b(append targets + generate install command)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
-read -r -u 3 -p "Choose [1/2]: " MAIN_MODE || true
+printf '  %b2%b) Add Slave Server %b(append targets + generate install command)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+printf '  %b3%b) Remove Slave Server %b(remove targets by alias)%b\n' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+read -r -u 3 -p "Choose [1/2/3]: " MAIN_MODE || true
 case "$MAIN_MODE" in
   1|"") MAIN_MODE="hub" ;;
-  2) MAIN_MODE="client" ;;
+  2) MAIN_MODE="add-slave" ;;
+  3) MAIN_MODE="remove-slave" ;;
   *) err "Invalid selection"; exit 1 ;;
 esac
 
-if [ "$MAIN_MODE" = "client" ]; then
+if [ "$MAIN_MODE" = "add-slave" ]; then
   add_remote_client
+  exit 0
+fi
+
+if [ "$MAIN_MODE" = "remove-slave" ]; then
+  remove_remote_client
   exit 0
 fi
 
@@ -1108,7 +1150,7 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
 else
   printf '  %-20s %s\n' "Grafana:" "disabled"
 fi
-printf '  %-20s %s\n' "Client installer:" "enabled (port $WEB_PORT)"
+printf '  %-20s %s\n' "Slave installer:" "enabled (port $WEB_PORT)"
 hr
 echo ""
 
@@ -1422,7 +1464,7 @@ if [ "$ENABLE_GRAFANA" -eq 1 ]; then
 else
   ok "DONE → Prometheus is running"
 fi
-ok "DONE → Client installer http://$HUB_IP:$WEB_PORT/install-client.sh"
-info "Run this on a client (copy/paste):"
+ok "DONE → Slave installer http://$HUB_IP:$WEB_PORT/install-client.sh"
+info "Run this on a slave server (copy/paste):"
 printf '  curl -fsSL http://%s:%s/install-client.sh | bash\n' "$HUB_IP" "$WEB_PORT"
 ok "DONE → Stack version $STACK_VERSION"
