@@ -50,7 +50,7 @@ is_back_choice() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.12"
+STACK_VERSION="2026.02.08.13"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -731,14 +731,14 @@ while :; do
   case "$MAIN_MODE" in
     1|"") MAIN_MODE="hub"; break ;;
     2)
-      add_remote_client
-      rc=$?
+      rc=0
+      add_remote_client || rc=$?
       [ "$rc" -eq 10 ] && continue
       exit "$rc"
       ;;
     3)
-      remove_remote_client
-      rc=$?
+      rc=0
+      remove_remote_client || rc=$?
       [ "$rc" -eq 10 ] && continue
       exit "$rc"
       ;;
