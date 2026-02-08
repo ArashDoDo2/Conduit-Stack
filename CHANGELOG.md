@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.17]
+- Increased timeseries panel heights in Grafana dashboard.
+- Moved legends from bottom table view to right-side list view.
+- Reduced legend scrolling pressure for multi-server views.
+
 ## [2026.02.08.16]
 - Added hub IP auto-detection in `ensure_hub_ip`.
 - Detection order:
