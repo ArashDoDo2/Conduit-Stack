@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.29]
+- Updated Conduit CLI integration to use `--max-common-clients` instead of deprecated `--max-clients` in Hub and generated Slave compose commands.
+- Kept backward compatibility in generated Slave installer argument parsing by accepting both `--max-clients` and `--max-common-clients`.
+- Updated generated Slave install command hints to emit `--max-common-clients`.
+- Updated bandwidth prompts/summary wording from per-client to total limit and aligned numeric validation with float-compatible Conduit bandwidth flag.
+
 ## [2026.02.08.25]
 - Fixed hub CPU/RAM graphs by targeting local `node-exporter` via service name.
 

@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.28"
+STACK_VERSION="2026.02.08.29"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -298,7 +298,7 @@ BASE_PORT_DEFAULT="__BASE_PORT__"
 
 COUNT=""
 BASE_PORT=""
-MAX_CLIENTS=""
+MAX_COMMON_CLIENTS=""
 BW_Mbps=""
 UPGRADE_ONLY=0
 
@@ -306,7 +306,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --count) COUNT="$2"; shift 2 ;;
     --base-port) BASE_PORT="$2"; shift 2 ;;
-    --max-clients) MAX_CLIENTS="$2"; shift 2 ;;
+    --max-clients|--max-common-clients) MAX_COMMON_CLIENTS="$2"; shift 2 ;;
     --bandwidth) BW_Mbps="$2"; shift 2 ;;
     --upgrade) UPGRADE_ONLY=1; shift ;;
     *) err "Unknown argument: $1"; exit 1 ;;
@@ -315,7 +315,7 @@ done
 
 COUNT=${COUNT:-}
 BASE_PORT=${BASE_PORT:-$BASE_PORT_DEFAULT}
-MAX_CLIENTS=${MAX_CLIENTS:-50}
+MAX_COMMON_CLIENTS=${MAX_COMMON_CLIENTS:-50}
 BW_Mbps=${BW_Mbps:-8}
 
 if [ "$UPGRADE_ONLY" -ne 1 ]; then
@@ -331,10 +331,11 @@ fi
 BASE_PORT=$(printf '%s' "$BASE_PORT" | tr -d '[:space:]')
 [[ "$BASE_PORT" =~ ^[0-9]+$ ]] && [ "$BASE_PORT" -ge 1 ] && [ "$BASE_PORT" -le 65535 ] || { err "Invalid base port"; exit 1; }
 
-MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
+MAX_COMMON_CLIENTS=$(printf '%s' "$MAX_COMMON_CLIENTS" | tr -d '[:space:]')
 BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
-[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { err "Invalid max clients"; exit 1; }
-[[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
+[[ "$MAX_COMMON_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_COMMON_CLIENTS" -ge 0 ] || { err "Invalid max common clients"; exit 1; }
+[[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
+awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
 
 is_wsl() {
   grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || \
@@ -620,7 +621,7 @@ for i in "${TARGET_CONDUITS[@]}"; do
     restart: unless-stopped
     command:
       ["start",
-       "--max-clients","$MAX_CLIENTS",
+       "--max-common-clients","$MAX_COMMON_CLIENTS",
        "--bandwidth","$BW_Mbps",
        "--data-dir","/home/conduit/data",
        "--metrics-addr","0.0.0.0:$PORT"]
@@ -823,7 +824,7 @@ add_remote_client() {
   is_back_choice "$max_clients" && return 10
   [[ "$max_clients" =~ ^[0-9]+$ ]] && [ "$max_clients" -gt 0 ] || { err "Invalid max clients"; exit 1; }
 
-  read -r -u 3 -p "Bandwidth per client (Mbps) on slave server? [8]: " bw_mbps || true
+  read -r -u 3 -p "Total bandwidth limit (Mbps) on slave server? [8]: " bw_mbps || true
   bw_mbps=${bw_mbps:-8}
   bw_mbps=$(printf '%s' "$bw_mbps" | tr -d '[:space:]')
   is_quit_choice "$bw_mbps" && exit 0
@@ -837,7 +838,7 @@ add_remote_client() {
   hr
   ok "Slave server targets appended to $TARGETS_FILE (Prometheus will pick them up automatically)."
   info "Run this on the slave server:"
-  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-clients %s --bandwidth %s\n' \
+  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-common-clients %s --bandwidth %s\n' \
     "$hub_ip" "$web_port" "$count" "$base_port" "$max_clients" "$bw_mbps"
   info "Upgrade existing slave conduits only (no data reset):"
   printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --upgrade\n' \
@@ -1203,8 +1204,11 @@ REMOVE_DATA=0
 EXISTING_MAX_CLIENTS=""
 EXISTING_BW=""
 if [ -f docker-compose.yml ]; then
-  EXISTING_MAX_CLIENTS=$(sed -n 's/.*--max-clients","\([0-9][0-9]*\)".*/\1/p' docker-compose.yml | head -n1 || true)
-  EXISTING_BW=$(sed -n 's/.*--bandwidth","\([0-9][0-9]*\)".*/\1/p' docker-compose.yml | head -n1 || true)
+  EXISTING_MAX_CLIENTS=$(sed -n 's/.*--max-common-clients","\([0-9][0-9]*\)".*/\1/p' docker-compose.yml | head -n1 || true)
+  if [ -z "$EXISTING_MAX_CLIENTS" ]; then
+    EXISTING_MAX_CLIENTS=$(sed -n 's/.*--max-clients","\([0-9][0-9]*\)".*/\1/p' docker-compose.yml | head -n1 || true)
+  fi
+  EXISTING_BW=$(sed -n 's/.*--bandwidth","\([0-9][0-9]*\(\.[0-9][0-9]*\)\?\)".*/\1/p' docker-compose.yml | head -n1 || true)
 fi
 if [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
   echo ""
@@ -1302,7 +1306,7 @@ if [ "$NEED_LIMITS" -eq 1 ]; then
   MAX_CLIENTS=${MAX_CLIENTS:-${EXISTING_MAX_CLIENTS:-50}}
   MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
 
-  read -r -u 3 -p "Bandwidth per client (Mbps)? [${EXISTING_BW:-8}]: " BW_Mbps || true
+  read -r -u 3 -p "Total bandwidth limit (Mbps)? [${EXISTING_BW:-8}]: " BW_Mbps || true
   BW_Mbps=${BW_Mbps:-${EXISTING_BW:-8}}
   BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
 else
@@ -1311,7 +1315,8 @@ else
 fi
 
 [[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { err "Invalid max clients"; exit 1; }
-[[ "$BW_Mbps" =~ ^[0-9]+$ ]] && [ "$BW_Mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
+[[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
+awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
 
 ########################################
 # GRAFANA
@@ -1431,7 +1436,7 @@ else
   printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
 fi
 printf '  %-20s %s\n' "Max clients:" "$MAX_CLIENTS per Conduit"
-printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps per client"
+printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps total"
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   printf '  %-20s %s\n' "Grafana:" "enabled (port $GRAFANA_PORT)"
 else
@@ -1893,7 +1898,7 @@ cat >> docker-compose.yml <<EOF
     restart: unless-stopped
     command:
       ["start",
-       "--max-clients","$MAX_CLIENTS",
+       "--max-common-clients","$MAX_CLIENTS",
        "--bandwidth","$BW_Mbps",
        "--data-dir","/home/conduit/data",
        "--metrics-addr","0.0.0.0:$((BASE_PORT+idx-1))"]
