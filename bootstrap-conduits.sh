@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.29"
+STACK_VERSION="2026.02.08.31"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -333,9 +333,11 @@ BASE_PORT=$(printf '%s' "$BASE_PORT" | tr -d '[:space:]')
 
 MAX_COMMON_CLIENTS=$(printf '%s' "$MAX_COMMON_CLIENTS" | tr -d '[:space:]')
 BW_Mbps=$(printf '%s' "$BW_Mbps" | tr -d '[:space:]')
-[[ "$MAX_COMMON_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_COMMON_CLIENTS" -ge 0 ] || { err "Invalid max common clients"; exit 1; }
-[[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
-awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
+[[ "$MAX_COMMON_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_COMMON_CLIENTS" -ge 0 ] && [ "$MAX_COMMON_CLIENTS" -le 1000 ] || { err "Invalid max common clients (0-1000)"; exit 1; }
+if [ "$BW_Mbps" != "-1" ]; then
+  [[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
+  awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
+fi
 
 is_wsl() {
   grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || \
@@ -817,19 +819,22 @@ add_remote_client() {
   is_back_choice "$base_port" && return 10
   [[ "$base_port" =~ ^[0-9]+$ ]] && [ "$base_port" -ge 1 ] && [ "$base_port" -le 65535 ] || { err "Invalid base port"; exit 1; }
 
-  read -r -u 3 -p "Max clients per Conduit on slave server? [50]: " max_clients || true
+  read -r -u 3 -p "Max common clients per Conduit on slave server? [50]: " max_clients || true
   max_clients=${max_clients:-50}
   max_clients=$(printf '%s' "$max_clients" | tr -d '[:space:]')
   is_quit_choice "$max_clients" && exit 0
   is_back_choice "$max_clients" && return 10
-  [[ "$max_clients" =~ ^[0-9]+$ ]] && [ "$max_clients" -gt 0 ] || { err "Invalid max clients"; exit 1; }
+  [[ "$max_clients" =~ ^[0-9]+$ ]] && [ "$max_clients" -ge 0 ] && [ "$max_clients" -le 1000 ] || { err "Invalid max common clients (0-1000)"; exit 1; }
 
-  read -r -u 3 -p "Total bandwidth limit (Mbps) on slave server? [8]: " bw_mbps || true
+  read -r -u 3 -p "Total bandwidth limit (Mbps, -1 for unlimited) on slave server? [8]: " bw_mbps || true
   bw_mbps=${bw_mbps:-8}
   bw_mbps=$(printf '%s' "$bw_mbps" | tr -d '[:space:]')
   is_quit_choice "$bw_mbps" && exit 0
   is_back_choice "$bw_mbps" && return 10
-  [[ "$bw_mbps" =~ ^[0-9]+$ ]] && [ "$bw_mbps" -gt 0 ] || { err "Invalid bandwidth"; exit 1; }
+  if [ "$bw_mbps" != "-1" ]; then
+    [[ "$bw_mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
+    awk "BEGIN {exit !($bw_mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
+  fi
 
   append_client_targets "$client_alias" "$client_ip" "$base_port" "$count"
   migrate_targets_conduit_labels
@@ -1302,7 +1307,7 @@ if [ "${MODE:-1}" = "4" ] && [ "${ADD_COUNT:-0}" -eq 0 ] && [ "${UPGRADE:-0}" -n
 fi
 
 if [ "$NEED_LIMITS" -eq 1 ]; then
-  read -r -u 3 -p "Max clients per Conduit? [${EXISTING_MAX_CLIENTS:-50}]: " MAX_CLIENTS || true
+  read -r -u 3 -p "Max common clients per Conduit? [${EXISTING_MAX_CLIENTS:-50}]: " MAX_CLIENTS || true
   MAX_CLIENTS=${MAX_CLIENTS:-${EXISTING_MAX_CLIENTS:-50}}
   MAX_CLIENTS=$(printf '%s' "$MAX_CLIENTS" | tr -d '[:space:]')
 
@@ -1314,9 +1319,11 @@ else
   BW_Mbps=${EXISTING_BW:-8}
 fi
 
-[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -gt 0 ] || { err "Invalid max clients"; exit 1; }
-[[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
-awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
+[[ "$MAX_CLIENTS" =~ ^[0-9]+$ ]] && [ "$MAX_CLIENTS" -ge 0 ] && [ "$MAX_CLIENTS" -le 1000 ] || { err "Invalid max common clients (0-1000)"; exit 1; }
+if [ "$BW_Mbps" != "-1" ]; then
+  [[ "$BW_Mbps" =~ ^[0-9]+([.][0-9]+)?$ ]] || { err "Invalid bandwidth"; exit 1; }
+  awk "BEGIN {exit !($BW_Mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
+fi
 
 ########################################
 # GRAFANA
@@ -1435,7 +1442,7 @@ elif [ "${MODE:-1}" = "4" ] && [ "$EXISTING_COUNT" -gt 0 ]; then
 else
   printf '  %-20s %s\n' "Conduit instances:" "$COUNT"
 fi
-printf '  %-20s %s\n' "Max clients:" "$MAX_CLIENTS per Conduit"
+printf '  %-20s %s\n' "Max common clients:" "$MAX_CLIENTS per Conduit"
 printf '  %-20s %s\n' "Bandwidth limit:" "$BW_Mbps Mbps total"
 if [ "$ENABLE_GRAFANA" -eq 1 ]; then
   printf '  %-20s %s\n' "Grafana:" "enabled (port $GRAFANA_PORT)"
@@ -1603,7 +1610,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "none",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "sum(conduit_max_clients)" }]
+      "targets": [{ "expr": "sum(conduit_max_common_clients)" }]
     },
     {
       "type": "stat",
@@ -1619,7 +1626,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
         "graphMode": "none",
         "justifyMode": "center"
       },
-      "targets": [{ "expr": "sum(conduit_max_clients) - sum(conduit_connected_clients)" }]
+      "targets": [{ "expr": "sum(conduit_max_common_clients) - sum(conduit_connected_clients)" }]
     },
     {
       "type": "table",
@@ -1818,9 +1825,116 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     },
 
     {
+      "type": "timeseries",
+      "title": "Region Connected Clients (scope/region)",
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by(scope,region) (conduit_region_connected_clients)",
+        "legendFormat": "{{scope}}/{{region}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Region Connecting Clients (scope/region)",
+      "gridPos": { "x": 12, "y": 34, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by(scope,region) (conduit_region_connecting_clients)",
+        "legendFormat": "{{scope}}/{{region}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Region Uploaded Bytes (scope/region, cumulative)",
+      "gridPos": { "x": 0, "y": 44, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by(scope,region) (conduit_region_bytes_uploaded)",
+        "legendFormat": "{{scope}}/{{region}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Region Downloaded Bytes (scope/region, cumulative)",
+      "gridPos": { "x": 12, "y": 44, "w": 12, "h": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        }
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by(scope,region) (conduit_region_bytes_downloaded)",
+        "legendFormat": "{{scope}}/{{region}}"
+      }]
+    },
+
+    {
       "type": "stat",
       "title": "Server Count",
-      "gridPos": { "x": 0, "y": 34, "w": 6, "h": 4 },
+      "gridPos": { "x": 0, "y": 54, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "teal" } }
       },
@@ -1834,7 +1948,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Conduits",
-      "gridPos": { "x": 6, "y": 34, "w": 6, "h": 4 },
+      "gridPos": { "x": 6, "y": 54, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "color": { "mode": "fixed", "fixedColor": "yellow" } }
       },
@@ -1848,7 +1962,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Uploaded (All Servers)",
-      "gridPos": { "x": 12, "y": 34, "w": 6, "h": 4 },
+      "gridPos": { "x": 12, "y": 54, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },
@@ -1857,7 +1971,7 @@ cat > grafana-provisioning/dashboards/conduit-dashboard.json <<'EOF'
     {
       "type": "stat",
       "title": "Total Downloaded (All Servers)",
-      "gridPos": { "x": 18, "y": 34, "w": 6, "h": 4 },
+      "gridPos": { "x": 18, "y": 54, "w": 6, "h": 4 },
       "fieldConfig": {
         "defaults": { "unit": "bytes" }
       },

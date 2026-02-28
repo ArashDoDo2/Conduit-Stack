@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.02.08.31]
+- Added Grafana region/scope panels for new Conduit per-region gauges:
+  - `conduit_region_connected_clients`
+  - `conduit_region_connecting_clients`
+  - `conduit_region_bytes_uploaded`
+  - `conduit_region_bytes_downloaded`
+- Grouped region panels by `scope` and `region` labels and moved summary stat row down to avoid panel overlap.
+
+## [2026.02.08.30]
+- Added Conduit vNext-safe validation for max common clients (0-1000) in both Hub and generated Slave flows.
+- Added Conduit vNext-safe bandwidth validation to allow `-1` (unlimited) or positive numeric values.
+- Updated Hub prompts/summary wording to `Max common clients` and bandwidth prompt to mention `-1` unlimited.
+- Updated Grafana capacity queries from `conduit_max_clients` to `conduit_max_common_clients`.
+
 ## [2026.02.08.29]
 - Updated Conduit CLI integration to use `--max-common-clients` instead of deprecated `--max-clients` in Hub and generated Slave compose commands.
 - Kept backward compatibility in generated Slave installer argument parsing by accepting both `--max-clients` and `--max-common-clients`.
