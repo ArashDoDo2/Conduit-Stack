@@ -87,6 +87,7 @@ Installer modes:
   - `--count`
   - `--base-port`
   - `--max-clients`
+  - `--conduit-mode docker|native`
   - `--bandwidth`
 - Upgrade-only mode:
   - `--upgrade`
@@ -99,9 +100,9 @@ curl -fsSL http://<hub-ip>:<web-port>/install-client.sh | bash -s -- --upgrade
 
 Data safety on slave:
 
-- Existing `conduitN` containers are preserved in normal add flow.
+- Existing `conduitN` instances are preserved in normal add flow (container or native service).
 - Only missing conduits are created.
-- `--upgrade` updates existing conduits without wiping data volumes.
+- `--upgrade` updates/restarts existing conduits without wiping data.
 
 ## Dashboard Coverage
 
@@ -192,6 +193,14 @@ After pulling newer script code on hub:
 - Docker Engine
 - Docker Compose (`docker compose` or `docker-compose`)
 - Internet access for image pulls
+
+Slave native mode notes:
+
+- You can install Conduit as native `systemd` services by using `--conduit-mode native`.
+- Native mode supports exactly one Conduit instance per slave.
+- In native mode, installer uses existing `conduit` binary when available, otherwise installs/updates it from the configured image.
+- In `--upgrade --conduit-mode native`, installer updates the native `conduit` binary from the configured image, then restarts native services.
+- `node-exporter` still runs via Docker for CPU/RAM dashboards.
 
 Implementation notes:
 

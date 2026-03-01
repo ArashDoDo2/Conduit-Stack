@@ -63,7 +63,7 @@ script_path() {
 # CONFIG
 ########################################
 IMAGE="ghcr.io/psiphon-inc/conduit/cli:latest"
-STACK_VERSION="2026.02.08.31"
+STACK_VERSION="2026.03.01.32"
 BASE_PORT=9090
 GRAFANA_PORT=3000
 BACKUP_DIR="./backups"
@@ -301,6 +301,7 @@ BASE_PORT=""
 MAX_COMMON_CLIENTS=""
 BW_Mbps=""
 UPGRADE_ONLY=0
+CONDUIT_MODE="docker"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -309,6 +310,8 @@ while [ "$#" -gt 0 ]; do
     --max-clients|--max-common-clients) MAX_COMMON_CLIENTS="$2"; shift 2 ;;
     --bandwidth) BW_Mbps="$2"; shift 2 ;;
     --upgrade) UPGRADE_ONLY=1; shift ;;
+    --conduit-mode) CONDUIT_MODE="$2"; shift 2 ;;
+    --native) CONDUIT_MODE="native"; shift ;;
     *) err "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -317,6 +320,8 @@ COUNT=${COUNT:-}
 BASE_PORT=${BASE_PORT:-$BASE_PORT_DEFAULT}
 MAX_COMMON_CLIENTS=${MAX_COMMON_CLIENTS:-50}
 BW_Mbps=${BW_Mbps:-8}
+CONDUIT_MODE=$(printf '%s' "$CONDUIT_MODE" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+[ "$CONDUIT_MODE" = "docker" ] || [ "$CONDUIT_MODE" = "native" ] || { err "Invalid conduit mode. Use docker or native."; exit 1; }
 
 if [ "$UPGRADE_ONLY" -ne 1 ]; then
   if [ -z "$COUNT" ]; then
@@ -326,6 +331,11 @@ if [ "$UPGRADE_ONLY" -ne 1 ]; then
   fi
   COUNT=$(printf '%s' "$COUNT" | tr -d '[:space:]')
   [[ "$COUNT" =~ ^[0-9]+$ ]] && [ "$COUNT" -gt 0 ] || { err "Invalid number of Conduit instances"; exit 1; }
+fi
+
+if [ "$UPGRADE_ONLY" -ne 1 ] && [ "$CONDUIT_MODE" = "native" ] && [ "$COUNT" -ne 1 ]; then
+  err "Native mode supports exactly 1 Conduit instance."
+  exit 1
 fi
 
 BASE_PORT=$(printf '%s' "$BASE_PORT" | tr -d '[:space:]')
@@ -342,6 +352,84 @@ fi
 is_wsl() {
   grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || \
   grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+run_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    err "This action needs root privileges (or sudo)."
+    exit 1
+  fi
+}
+
+detect_native_conduits() {
+  local f idx
+  NATIVE_IDX=()
+  for f in /etc/systemd/system/conduit[0-9]*.service; do
+    [ -e "$f" ] || continue
+    idx=$(basename "$f")
+    idx=${idx#conduit}
+    idx=${idx%.service}
+    [[ "$idx" =~ ^[0-9]+$ ]] && NATIVE_IDX+=("$idx")
+  done
+}
+
+install_native_conduit_service() {
+  local i="$1"
+  local port="$2"
+  local bin_path="$3"
+  local data_dir="/var/lib/conduit/conduit$i-data"
+  local service_file="/etc/systemd/system/conduit$i.service"
+  local tmp_file
+
+  tmp_file=$(mktemp)
+  cat > "$tmp_file" <<EOF
+[Unit]
+Description=Conduit instance $i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$bin_path start --max-common-clients $MAX_COMMON_CLIENTS --bandwidth $BW_Mbps --data-dir $data_dir --metrics-addr 0.0.0.0:$port
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  run_root mkdir -p "$data_dir"
+  run_root install -m 0644 "$tmp_file" "$service_file"
+  rm -f "$tmp_file"
+}
+
+extract_conduit_binary_from_image() {
+  local out_path="$1"
+  local cid=""
+  cid=$(docker create "$IMAGE" 2>/dev/null || true)
+  [ -n "$cid" ] || return 1
+  if docker cp "$cid:/usr/local/bin/conduit" "$out_path" >/dev/null 2>&1 || \
+     docker cp "$cid:/bin/conduit" "$out_path" >/dev/null 2>&1 || \
+     docker cp "$cid:/conduit" "$out_path" >/dev/null 2>&1; then
+    docker rm -f "$cid" >/dev/null 2>&1 || true
+    return 0
+  fi
+  docker rm -f "$cid" >/dev/null 2>&1 || true
+  return 1
+}
+
+update_native_conduit_binary() {
+  local tmp_bin
+  tmp_bin=$(mktemp)
+  info "Updating native conduit binary from image: $IMAGE"
+  docker pull "$IMAGE" >/dev/null 2>&1 || { rm -f "$tmp_bin"; err "Failed to pull conduit image: $IMAGE"; exit 1; }
+  extract_conduit_binary_from_image "$tmp_bin" || { rm -f "$tmp_bin"; err "Could not extract conduit binary from image: $IMAGE"; exit 1; }
+  run_root install -m 0755 "$tmp_bin" /usr/local/bin/conduit
+  rm -f "$tmp_bin"
 }
 
 detect_deploy_mode() {
@@ -545,20 +633,16 @@ container_exists() {
   docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$name"
 }
 
-EXISTING_CONDUITS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^conduit[0-9]+$' || true)
-EXISTING_IDX=()
-if [ -n "$EXISTING_CONDUITS" ]; then
-  while IFS= read -r name; do
-    idx="${name#conduit}"
-    [[ "$idx" =~ ^[0-9]+$ ]] && EXISTING_IDX+=("$idx")
-  done <<< "$EXISTING_CONDUITS"
-fi
+native_service_exists() {
+  local i="$1"
+  [ -f "/etc/systemd/system/conduit$i.service" ]
+}
 
 info "Configuring firewall (ufw) for node-exporter..."
 if command -v ufw >/dev/null 2>&1; then
-  ufw allow from "$HUB_IP" to any port 9100 proto tcp >/dev/null 2>&1 || true
-  ufw deny 9100 >/dev/null 2>&1 || true
-  ufw --force enable >/dev/null 2>&1 || true
+  run_root ufw allow from "$HUB_IP" to any port 9100 proto tcp >/dev/null 2>&1 || true
+  run_root ufw deny 9100 >/dev/null 2>&1 || true
+  run_root ufw --force enable >/dev/null 2>&1 || true
 else
   warn "ufw not installed; skipping firewall configuration."
 fi
@@ -587,34 +671,44 @@ EOF
 
 TARGET_CONDUITS=()
 DISPLAY_COUNT=0
-if [ "$UPGRADE_ONLY" -eq 1 ]; then
-  if [ "${#EXISTING_IDX[@]}" -eq 0 ]; then
-    err "No existing conduit containers found to upgrade."
-    exit 1
+if [ "$CONDUIT_MODE" = "docker" ]; then
+  EXISTING_CONDUITS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^conduit[0-9]+$' || true)
+  EXISTING_IDX=()
+  if [ -n "$EXISTING_CONDUITS" ]; then
+    while IFS= read -r name; do
+      idx="${name#conduit}"
+      [[ "$idx" =~ ^[0-9]+$ ]] && EXISTING_IDX+=("$idx")
+    done <<< "$EXISTING_CONDUITS"
   fi
-  TARGET_CONDUITS=("${EXISTING_IDX[@]}")
-  DISPLAY_COUNT="${#TARGET_CONDUITS[@]}"
-  info "Upgrade mode: updating existing conduits only: ${TARGET_CONDUITS[*]}"
-else
-  MISSING_CONDUITS=()
-  EXISTING_CONDUIT_NAMES=()
-  for i in $(seq 1 "$COUNT"); do
-    if container_exists "conduit$i"; then
-      EXISTING_CONDUIT_NAMES+=("conduit$i")
-      continue
-    fi
-    MISSING_CONDUITS+=("$i")
-  done
-  if [ "${#EXISTING_CONDUIT_NAMES[@]}" -gt 0 ]; then
-    warn "Existing conduits detected; preserving without recreate: ${EXISTING_CONDUIT_NAMES[*]}"
-  fi
-  TARGET_CONDUITS=("${MISSING_CONDUITS[@]}")
-  DISPLAY_COUNT="$COUNT"
-fi
 
-for i in "${TARGET_CONDUITS[@]}"; do
-  PORT=$((BASE_PORT + i - 1))
-  cat >> docker-compose.yml <<EOF
+  if [ "$UPGRADE_ONLY" -eq 1 ]; then
+    if [ "${#EXISTING_IDX[@]}" -eq 0 ]; then
+      err "No existing conduit containers found to upgrade."
+      exit 1
+    fi
+    TARGET_CONDUITS=("${EXISTING_IDX[@]}")
+    DISPLAY_COUNT="${#TARGET_CONDUITS[@]}"
+    info "Upgrade mode: updating existing docker conduits only: ${TARGET_CONDUITS[*]}"
+  else
+    MISSING_CONDUITS=()
+    EXISTING_CONDUIT_NAMES=()
+    for i in $(seq 1 "$COUNT"); do
+      if container_exists "conduit$i"; then
+        EXISTING_CONDUIT_NAMES+=("conduit$i")
+        continue
+      fi
+      MISSING_CONDUITS+=("$i")
+    done
+    if [ "${#EXISTING_CONDUIT_NAMES[@]}" -gt 0 ]; then
+      warn "Existing docker conduits detected; preserving without recreate: ${EXISTING_CONDUIT_NAMES[*]}"
+    fi
+    TARGET_CONDUITS=("${MISSING_CONDUITS[@]}")
+    DISPLAY_COUNT="$COUNT"
+  fi
+
+  for i in "${TARGET_CONDUITS[@]}"; do
+    PORT=$((BASE_PORT + i - 1))
+    cat >> docker-compose.yml <<EOF
 
   conduit$i:
     image: $IMAGE
@@ -632,11 +726,49 @@ for i in "${TARGET_CONDUITS[@]}"; do
     volumes:
       - ./conduit$i-data:/home/conduit/data
 EOF
-done
+  done
 
-for i in "${TARGET_CONDUITS[@]}"; do
-  mkdir -p "conduit$i-data"
-done
+  for i in "${TARGET_CONDUITS[@]}"; do
+    mkdir -p "conduit$i-data"
+  done
+else
+  command -v systemctl >/dev/null 2>&1 || { err "systemctl is required for native mode."; exit 1; }
+
+  detect_native_conduits
+  if [ "$UPGRADE_ONLY" -eq 1 ]; then
+    if [ "${#NATIVE_IDX[@]}" -eq 0 ]; then
+      err "No existing native conduit services found to upgrade."
+      exit 1
+    fi
+    update_native_conduit_binary
+    CONDUIT_BIN=$(command -v conduit || true)
+    [ -n "$CONDUIT_BIN" ] || { err "conduit binary not found in PATH after upgrade."; exit 1; }
+    TARGET_CONDUITS=("${NATIVE_IDX[@]}")
+    DISPLAY_COUNT="${#TARGET_CONDUITS[@]}"
+    info "Upgrade mode: restarting existing native conduits only: ${TARGET_CONDUITS[*]}"
+  else
+    CONDUIT_BIN=$(command -v conduit || true)
+    if [ -z "$CONDUIT_BIN" ]; then
+      update_native_conduit_binary
+      CONDUIT_BIN=$(command -v conduit || true)
+    fi
+    [ -n "$CONDUIT_BIN" ] || { err "conduit binary not found in PATH for native mode."; exit 1; }
+    MISSING_CONDUITS=()
+    EXISTING_CONDUIT_NAMES=()
+    for i in $(seq 1 "$COUNT"); do
+      if native_service_exists "$i"; then
+        EXISTING_CONDUIT_NAMES+=("conduit$i")
+        continue
+      fi
+      MISSING_CONDUITS+=("$i")
+    done
+    if [ "${#EXISTING_CONDUIT_NAMES[@]}" -gt 0 ]; then
+      warn "Existing native conduits detected; preserving without recreate: ${EXISTING_CONDUIT_NAMES[*]}"
+    fi
+    TARGET_CONDUITS=("${MISSING_CONDUITS[@]}")
+    DISPLAY_COUNT="$COUNT"
+  fi
+fi
 
 info "Starting client stack..."
 if [ "$UPGRADE_ONLY" -eq 1 ]; then
@@ -647,6 +779,25 @@ else
   compose up -d
 fi
 
+if [ "$CONDUIT_MODE" = "native" ]; then
+  if [ "$UPGRADE_ONLY" -eq 1 ]; then
+    for i in "${TARGET_CONDUITS[@]}"; do
+      run_root systemctl restart "conduit$i.service"
+    done
+  else
+    for i in "${TARGET_CONDUITS[@]}"; do
+      PORT=$((BASE_PORT + i - 1))
+      install_native_conduit_service "$i" "$PORT" "$CONDUIT_BIN"
+    done
+    if [ "${#TARGET_CONDUITS[@]}" -gt 0 ]; then
+      run_root systemctl daemon-reload
+      for i in "${TARGET_CONDUITS[@]}"; do
+        run_root systemctl enable --now "conduit$i.service"
+      done
+    fi
+  fi
+fi
+
 HOSTNAME=$(hostname | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | cut -c1-30)
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 info "Client ready."
@@ -654,6 +805,7 @@ info "Name: ${HOSTNAME:-unknown}"
 info "IP: ${IP:-unknown}"
 info "Conduits: $DISPLAY_COUNT"
 info "Base metrics port: $BASE_PORT"
+info "Conduit mode: $CONDUIT_MODE"
 info "node-exporter: 9100 (Basic Auth enabled)"
 CLIENT_EOF
 
@@ -787,7 +939,7 @@ add_remote_client() {
     exit 1
   fi
 
-  local hub_ip node_pw client_alias client_ip count base_port max_clients bw_mbps web_port
+  local hub_ip node_pw client_alias client_ip count base_port max_clients bw_mbps conduit_mode web_port
   node_pw=$(cat "$NODE_EXPORTER_PASSWORD_FILE")
   hub_ip=$(ensure_hub_ip)
   web_port=$(cat "$WEB_PORT_FILE" 2>/dev/null || printf '%s' "$WEB_PORT")
@@ -836,6 +988,17 @@ add_remote_client() {
     awk "BEGIN {exit !($bw_mbps > 0)}" || { err "Invalid bandwidth"; exit 1; }
   fi
 
+  read -r -u 3 -p "Conduit install mode on slave? [docker/native] [docker]: " conduit_mode || true
+  conduit_mode=${conduit_mode:-docker}
+  conduit_mode=$(printf '%s' "$conduit_mode" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  is_quit_choice "$conduit_mode" && exit 0
+  is_back_choice "$conduit_mode" && return 10
+  [ "$conduit_mode" = "docker" ] || [ "$conduit_mode" = "native" ] || { err "Invalid conduit mode (docker/native)."; exit 1; }
+  if [ "$conduit_mode" = "native" ] && [ "$count" -ne 1 ]; then
+    err "Native mode supports exactly 1 Conduit instance on slave."
+    exit 1
+  fi
+
   append_client_targets "$client_alias" "$client_ip" "$base_port" "$count"
   migrate_targets_conduit_labels
   generate_client_script "$hub_ip" "$node_pw"
@@ -843,11 +1006,11 @@ add_remote_client() {
   hr
   ok "Slave server targets appended to $TARGETS_FILE (Prometheus will pick them up automatically)."
   info "Run this on the slave server:"
-  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-common-clients %s --bandwidth %s\n' \
-    "$hub_ip" "$web_port" "$count" "$base_port" "$max_clients" "$bw_mbps"
+  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --count %s --base-port %s --max-common-clients %s --bandwidth %s --conduit-mode %s\n' \
+    "$hub_ip" "$web_port" "$count" "$base_port" "$max_clients" "$bw_mbps" "$conduit_mode"
   info "Upgrade existing slave conduits only (no data reset):"
-  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --upgrade\n' \
-    "$hub_ip" "$web_port"
+  printf '  curl -fsSL http://%s:%s/install-client.sh | bash -s -- --upgrade --conduit-mode %s\n' \
+    "$hub_ip" "$web_port" "$conduit_mode"
   hr
 }
 
