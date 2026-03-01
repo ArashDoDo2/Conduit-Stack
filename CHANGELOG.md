@@ -2,6 +2,9 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.03.01.33]
+- Bumped stack version to keep versioning aligned with the latest pushed changes.
+
 ## [2026.03.01.32]
 - Added slave conduit install mode selection (`docker` or `native`) in `Add Slave Server`.
 - Added generated slave installer support for `--conduit-mode` and `--native`.
