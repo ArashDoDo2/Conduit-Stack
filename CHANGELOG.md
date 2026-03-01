@@ -7,7 +7,7 @@ All notable changes to this project are documented in this file.
 - Added generated slave installer support for `--conduit-mode` and `--native`.
 - Added native Conduit systemd flow on slave while keeping node-exporter in Docker for metrics.
 - Enforced native mode limit to exactly one Conduit instance per slave.
-- In native upgrade mode, updater now refreshes native `conduit` binary from configured image and restarts native service.
+- In native upgrade mode, updater now downloads latest native `conduit` binary from official Conduit releases and restarts native service.
 
 ## [2026.02.08.31]
 - Added Grafana region/scope panels for new Conduit per-region gauges:

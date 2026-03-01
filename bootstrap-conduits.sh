@@ -407,27 +407,90 @@ EOF
   rm -f "$tmp_file"
 }
 
-extract_conduit_binary_from_image() {
+download_latest_native_conduit_binary() {
   local out_path="$1"
-  local cid=""
-  cid=$(docker create "$IMAGE" 2>/dev/null || true)
-  [ -n "$cid" ] || return 1
-  if docker cp "$cid:/usr/local/bin/conduit" "$out_path" >/dev/null 2>&1 || \
-     docker cp "$cid:/bin/conduit" "$out_path" >/dev/null 2>&1 || \
-     docker cp "$cid:/conduit" "$out_path" >/dev/null 2>&1; then
-    docker rm -f "$cid" >/dev/null 2>&1 || true
-    return 0
-  fi
-  docker rm -f "$cid" >/dev/null 2>&1 || true
-  return 1
+  local arch raw_arch api_url asset_url tmp_payload tmp_json tmp_dir bin_candidate
+  raw_arch=$(uname -m 2>/dev/null || true)
+  case "$raw_arch" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    armv7l|armv7) arch="armv7" ;;
+    *) err "Unsupported architecture for native conduit download: $raw_arch"; return 1 ;;
+  esac
+
+  command -v curl >/dev/null 2>&1 || { err "curl is required to download native conduit."; return 1; }
+  command -v python3 >/dev/null 2>&1 || { err "python3 is required to select release asset."; return 1; }
+
+  api_url="https://api.github.com/repos/Psiphon-Inc/conduit/releases/latest"
+  tmp_json=$(mktemp)
+  curl -fsSL "$api_url" -o "$tmp_json" || { rm -f "$tmp_json"; err "Failed to fetch latest conduit release metadata."; return 1; }
+
+  asset_url=$(python3 - "$tmp_json" "$arch" <<'PY'
+import json, sys
+path=sys.argv[1]
+arch=sys.argv[2]
+with open(path, "r", encoding="utf-8") as f:
+    data=json.load(f)
+assets=data.get("assets", [])
+deny_ext=(".deb", ".rpm", ".apk", ".sha256", ".sig", ".txt")
+scores=[]
+for a in assets:
+    name=(a.get("name") or "").lower()
+    url=a.get("browser_download_url") or ""
+    if not name or not url:
+        continue
+    if "linux" not in name:
+        continue
+    if arch not in name:
+        continue
+    if any(name.endswith(ext) for ext in deny_ext):
+        continue
+    if "conduit" not in name:
+        continue
+    score=0
+    if name.endswith((".tar.gz", ".tgz", ".zip")):
+        score += 2
+    if "cli" in name:
+        score += 1
+    if "linux" in name and arch in name:
+        score += 1
+    scores.append((score, url))
+scores.sort(key=lambda x: x[0], reverse=True)
+print(scores[0][1] if scores else "")
+PY
+)
+  rm -f "$tmp_json"
+  [ -n "$asset_url" ] || { err "No suitable Linux asset found in latest release."; return 1; }
+
+  tmp_payload=$(mktemp)
+  curl -fsSL "$asset_url" -o "$tmp_payload" || { rm -f "$tmp_payload"; err "Failed to download conduit release asset."; return 1; }
+
+  case "$asset_url" in
+    *.tar.gz|*.tgz)
+      tmp_dir=$(mktemp -d)
+      tar -xzf "$tmp_payload" -C "$tmp_dir" >/dev/null 2>&1 || { rm -rf "$tmp_dir" "$tmp_payload"; err "Failed to extract conduit tarball."; return 1; }
+      bin_candidate=$(find "$tmp_dir" -type f -name conduit -perm -u+x | head -n1 || true)
+      if [ -z "$bin_candidate" ]; then
+        bin_candidate=$(find "$tmp_dir" -type f -name conduit | head -n1 || true)
+      fi
+      [ -n "$bin_candidate" ] || { rm -rf "$tmp_dir" "$tmp_payload"; err "Conduit binary not found in release archive."; return 1; }
+      cp "$bin_candidate" "$out_path"
+      chmod +x "$out_path"
+      rm -rf "$tmp_dir" "$tmp_payload"
+      ;;
+    *)
+      cp "$tmp_payload" "$out_path"
+      chmod +x "$out_path"
+      rm -f "$tmp_payload"
+      ;;
+  esac
 }
 
 update_native_conduit_binary() {
   local tmp_bin
   tmp_bin=$(mktemp)
-  info "Updating native conduit binary from image: $IMAGE"
-  docker pull "$IMAGE" >/dev/null 2>&1 || { rm -f "$tmp_bin"; err "Failed to pull conduit image: $IMAGE"; exit 1; }
-  extract_conduit_binary_from_image "$tmp_bin" || { rm -f "$tmp_bin"; err "Could not extract conduit binary from image: $IMAGE"; exit 1; }
+  info "Updating native conduit binary from official releases: https://github.com/Psiphon-Inc/conduit/releases"
+  download_latest_native_conduit_binary "$tmp_bin" || { rm -f "$tmp_bin"; exit 1; }
   run_root install -m 0755 "$tmp_bin" /usr/local/bin/conduit
   rm -f "$tmp_bin"
 }

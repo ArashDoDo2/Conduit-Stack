@@ -198,8 +198,8 @@ Slave native mode notes:
 
 - You can install Conduit as native `systemd` services by using `--conduit-mode native`.
 - Native mode supports exactly one Conduit instance per slave.
-- In native mode, installer uses existing `conduit` binary when available, otherwise installs/updates it from the configured image.
-- In `--upgrade --conduit-mode native`, installer updates the native `conduit` binary from the configured image, then restarts native services.
+- In native mode, installer uses existing `conduit` binary when available, otherwise downloads latest Linux binary from official Conduit releases.
+- In `--upgrade --conduit-mode native`, installer downloads latest native `conduit` binary from official Conduit releases, then restarts native services.
 - `node-exporter` still runs via Docker for CPU/RAM dashboards.
 
 Implementation notes:
